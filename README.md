@@ -225,3 +225,71 @@ launchctl load ~/Library/LaunchAgents/com.whisperflow.dictation.plist
 Note: running under launchd means macOS will re-prompt Microphone/Accessibility/
 Input Monitoring permissions for the python binary itself. Logs go to
 `/tmp/whisperflow.log`. To disable: `launchctl unload ~/Library/LaunchAgents/com.whisperflow.dictation.plist`.
+
+## Tingxie.app — run as a real app bundle (recommended)
+
+Running via the venv means the TCC permissions (Microphone / Accessibility /
+Input Monitoring) are granted to the **Homebrew python binary** — a Homebrew
+upgrade of python invalidates all three, and every other python script on the
+machine inherits them. Packaging as a proper .app fixes that: `py2app`'s
+launcher binary loads the embedded Python framework *in-process* (it doesn't
+exec python), so the running process is `Tingxie.app/Contents/MacOS/Tingxie`
+and macOS attaches the permissions to the bundle itself. (A shell-script
+wrapper .app would **not** work — the process image would still be python.)
+
+### Build
+
+```bash
+./make-app.sh          # → dist/Tingxie.app (~130MB), ad-hoc signed
+```
+
+The script uses `.venv` (installs the pure-python `py2app` into it on first
+run), excludes the unused Whisper backends, and ad-hoc signs the bundle. The
+230MB `models/` dir is **not** copied into the bundle — the app locates it via
+(in order): `$TINGXIE_HOME`, `models/` next to the source when running from
+the checkout, or `~/Library/Application Support/Tingxie/` (the build script
+symlinks `models` there so double-clicking the app in Finder also works).
+
+### Switch over from the venv LaunchAgent
+
+```bash
+ditto dist/Tingxie.app /Applications/Tingxie.app     # stable path for TCC
+
+# stop + remove the old python-based agent
+launchctl bootout gui/$UID/com.whisperflow.dictation
+rm ~/Library/LaunchAgents/com.whisperflow.dictation.plist
+
+# install + start the app-based agent
+cp com.tingxie.dictation.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.tingxie.dictation.plist
+```
+
+Logs move to `/tmp/tingxie.log` / `/tmp/tingxie.err`. Restart later with
+`launchctl kickstart -k gui/$UID/com.tingxie.dictation`.
+
+**macOS will re-prompt all three permissions** — they now belong to
+Tingxie.app, not python. On first launch: allow the **Accessibility** dialog,
+then add **Tingxie** under **System Settings → Privacy & Security → Input
+Monitoring** (the fn-key event tap needs it; if there's no prompt, add it
+manually with the ＋ button by picking /Applications/Tingxie.app), and allow
+**Microphone** on your first dictation. Restart the agent after granting:
+permissions are only picked up at process start. The old grants for python
+can be removed from those three panes afterwards.
+
+Rebuilt the app? macOS keeps the grants as long as the bundle ID and path
+stay the same (ad-hoc signatures change per build, so occasionally macOS asks
+again — just re-allow).
+
+### Validation checklist
+
+- [ ] `tail -f /tmp/tingxie.log` shows `Ready.` and no traceback
+- [ ] 🎙 icon appears in the menu bar
+- [ ] hold fn → 🔴 + "Listening…" pill (Input Monitoring OK, Microphone prompt appears once)
+- [ ] release → text pastes into the focused app (Accessibility OK)
+- [ ] shift+fn → 中文 in, English out (Ollama reachable from launchd env)
+- [ ] menu bar → History shows past transcripts (中文 reads back correctly)
+- [ ] `launchctl kickstart -k gui/$UID/com.tingxie.dictation` → comes back to Ready
+
+Rollback: `launchctl bootout gui/$UID/com.tingxie.dictation`, re-copy
+`com.whisperflow.dictation.plist` into `~/Library/LaunchAgents/` and
+`launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.whisperflow.dictation.plist`.

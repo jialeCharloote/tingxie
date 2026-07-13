@@ -24,7 +24,7 @@ def load():
     if not HISTORY_FILE.exists():
         return []
     try:
-        with open(HISTORY_FILE) as f:
+        with open(HISTORY_FILE, encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError):
         return []
@@ -34,7 +34,7 @@ def save(entries):
     """Save entries (list of dicts) to disk."""
     _ensure_dir()
     try:
-        with open(HISTORY_FILE, "w") as f:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
             json.dump(entries, f, ensure_ascii=False, indent=2)
     except IOError:
         pass  # silently fail
