@@ -98,6 +98,9 @@ All knobs live in [`config.py`](config.py):
 - `TAP_THRESHOLD` / `VAD_SILENCE` — tap-vs-hold split and the silence length
   that auto-ends a hands-free take
 - `CLEANUP_ENABLED` / `CLEANUP_MODEL` — LLM polish toggle and Ollama model
+- `CLEANUP_MIN_TOKENS` — skip the LLM pass for utterances shorter than this
+  (CJK chars + English words; default 8, `0` = always clean)
+- `DICTIONARY_ENABLED` / `DICTIONARY_FILE` — personal dictionary (see below)
 - `INJECT_METHOD` — `paste` (default, most reliable) or `type` (direct keystrokes,
   good for Terminal/VS Code)
 - `SOUNDS_ENABLED` / `MENU_BAR` / `OVERLAY_ENABLED` — UX toggles
@@ -114,15 +117,34 @@ All knobs live in [`config.py`](config.py):
 | `sounds.py`     | start/stop audio cues                            |
 | `audio.py`      | microphone capture                               |
 | `transcribe.py` | STT wrapper (SenseVoice / mlx / faster-whisper)  |
+| `dictionary.py` | personal dictionary (post-STT find/replace)      |
 | `inject.py`     | clipboard-paste / keystroke text injection       |
 | `config.py`     | all settings                                     |
+
+## Personal dictionary
+
+STT models fumble proper nouns (product names, coworkers, jargon). Fix them
+once in `~/.config/whisperflow/dictionary.json` — created with examples on
+first run — as `"wrong": "right"` pairs:
+
+```json
+{
+  "cloud code": "Claude Code",
+  "克劳德": "Claude"
+}
+```
+
+Pure-ASCII keys match whole words case-insensitively (including at 中英 seams
+like `用cloud code和`); keys containing CJK match exactly. Keys starting with
+`_` are comments. Edits apply to the next dictation — no restart needed.
 
 ## LLM cleanup (Phase 3)
 
 Transcripts are polished by a local LLM (`qwen2.5:7b` on Ollama): filler words
 removed (嗯/呃/那个/um/uh), punctuation fixed, zh/en mixing preserved verbatim
-(few-shot prompted — it will not translate). Adds ~1s per utterance; set
-`CLEANUP_ENABLED = False` to paste raw transcripts instantly. `cleanup.py`
+(few-shot prompted — it will not translate). Adds ~1s per utterance, so short
+utterances (under `CLEANUP_MIN_TOKENS`, default 8) skip it and paste instantly;
+set `CLEANUP_ENABLED = False` to skip it entirely. `cleanup.py`
 auto-starts `ollama serve` if it isn't running.
 
 ```bash

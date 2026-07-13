@@ -24,8 +24,9 @@ import time
 from rich.console import Console
 
 import config
+import dictionary
 from audio import Recorder
-from cleanup import Cleaner
+from cleanup import Cleaner, worth_cleaning
 from history import add as history_add, load as history_load
 from hotkey import make_listener
 from inject import inject
@@ -139,10 +140,15 @@ class DictationApp:
             if not text:
                 console.print("[dim](no speech detected)[/]")
                 return
+            text = dictionary.apply(text)
             console.print(f"[dim]raw:[/] {text}")
             if self.cleaner is not None and config.CLEANUP_ENABLED:
-                text = self.cleaner.clean(text)
-                console.print(f"[bold white]→ {text}[/]")
+                if worth_cleaning(text):
+                    # re-apply the dictionary in case the LLM re-broke a term
+                    text = dictionary.apply(self.cleaner.clean(text))
+                    console.print(f"[bold white]→ {text}[/]")
+                else:
+                    console.print("[dim](short utterance — cleanup skipped)[/]")
             inject(text)
             history_add(text)  # persist to disk
             self.history.insert(0, text)

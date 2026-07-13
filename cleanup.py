@@ -5,12 +5,26 @@ the text — without translating or rewriting. 100% local (localhost:11434).
 """
 
 import json
+import re
 import subprocess
 import time
 import urllib.error
 import urllib.request
 
 import config
+
+
+def worth_cleaning(text):
+    """Gate the LLM pass by utterance length: short replies aren't worth ~1s.
+
+    Mixed zh/en length = CJK characters + ASCII word runs, so "好的 sounds good"
+    counts as 4, not 2 "words".
+    """
+    if not config.CLEANUP_MIN_TOKENS:
+        return True
+    cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
+    words = len(re.findall(r"[A-Za-z0-9']+", text))
+    return cjk + words >= config.CLEANUP_MIN_TOKENS
 
 SYSTEM_PROMPT = """\
 你是一个语音转写文本的清理工具。只做这三件事:

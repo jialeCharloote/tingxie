@@ -43,6 +43,17 @@ CLEANUP_MODEL = "qwen2.5:7b"     # best local model for mixed zh/en text
 CLEANUP_KEEP_ALIVE = "30m"       # keep model warm in RAM between dictations
 CLEANUP_TIMEOUT = 20             # seconds; on timeout we paste the raw text
 
+# Skip the LLM pass for short utterances — quick replies ("好的 sounds good")
+# paste instantly, only longer dictations pay the ~1s polish. Length is counted
+# as CJK characters + English words; 0 = always clean.
+CLEANUP_MIN_TOKENS = 8
+
+# ── Personal dictionary ───────────────────────────────────────────────────────
+# Post-STT find/replace for words the model keeps getting wrong (names, jargon).
+# Rules file is created with examples on first run; edits apply live.
+DICTIONARY_ENABLED = True
+DICTIONARY_FILE = "~/.config/whisperflow/dictionary.json"
+
 # ── Audio capture ─────────────────────────────────────────────────────────────
 SAMPLE_RATE = 16000  # Whisper expects 16kHz mono
 CHANNELS = 1
