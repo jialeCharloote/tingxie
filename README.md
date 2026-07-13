@@ -20,12 +20,11 @@ backends in `config.py`.
 
 ### Model files
 
-SenseVoice lives in `models/` (not committed). To re-download:
+Models live in `models/` (not committed). To (re-)download SenseVoice and
+Silero VAD in one go:
 
 ```bash
-mkdir -p models && cd models
-curl -sLO https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2
-tar xjf sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2 && rm *.tar.bz2
+./download-models.sh
 ```
 
 ## Setup
@@ -69,6 +68,7 @@ Three ways to interact:
   gets pasted (any target language via `TRANSLATE_TARGET`). Pressing shift at
   any point *while* recording also toggles it — key order doesn't matter
 - **Double-tap fn** — toggle AI cleanup on/off (quick shortcut)
+- **Esc** — cancel an in-progress recording; nothing gets pasted
 
 While dictating, a floating pill at the bottom of the screen shows
 **● Listening… / ⏳ Processing…** (above all windows, click-through, all Spaces).

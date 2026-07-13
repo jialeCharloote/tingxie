@@ -22,11 +22,13 @@ class FnListener:
     Also detects double-tap: two presses within 0.3s → calls on_double_tap.
     """
 
-    def __init__(self, on_press, on_release, on_double_tap=None, on_shift=None):
+    def __init__(self, on_press, on_release, on_double_tap=None, on_shift=None,
+                 on_esc=None):
         self.on_press = on_press
         self.on_release = on_release
         self.on_double_tap = on_double_tap or (lambda: None)
         self.on_shift = on_shift or (lambda pressed: None)
+        self.on_esc = on_esc or (lambda: None)
         self._down = False
         self._shift = False
         self._last_press = 0.0  # time of the last fn press (for double-tap detection)
@@ -49,6 +51,17 @@ class FnListener:
         import Quartz
 
         type_ = Quartz.CGEventGetType(event)
+        if type_ == Quartz.kCGEventKeyDown:
+            # Esc (keycode 53) cancels an in-progress recording. The tap is
+            # listen-only so the focused app still receives the key.
+            if (
+                Quartz.CGEventGetIntegerValueField(
+                    event, Quartz.kCGKeyboardEventKeycode
+                )
+                == 53
+            ):
+                self.on_esc()
+            return
         if type_ == Quartz.kCGEventFlagsChanged:
             keycode = Quartz.CGEventGetIntegerValueField(
                 event, Quartz.kCGKeyboardEventKeycode
@@ -85,7 +98,8 @@ class FnListener:
             Quartz.kCGSessionEventTap,
             Quartz.kCGHeadInsertEventTap,
             Quartz.kCGEventTapOptionListenOnly,  # observe only, don't swallow keys
-            Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged),
+            Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)
+            | Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown),
             self._callback,
             None,
         )
@@ -133,9 +147,10 @@ class ChordListener:
             listener.join()
 
 
-def make_listener(hotkey, on_press, on_release, on_double_tap=None, on_shift=None):
+def make_listener(hotkey, on_press, on_release, on_double_tap=None, on_shift=None,
+                  on_esc=None):
     if hotkey.lower() in ("fn", "globe", "<fn>"):
-        return FnListener(on_press, on_release, on_double_tap, on_shift)
+        return FnListener(on_press, on_release, on_double_tap, on_shift, on_esc)
     return ChordListener(hotkey, on_press, on_release)
 
 

@@ -86,7 +86,8 @@ class DictationApp:
         )
         console.print("[bold green]Ready.[/] "
                       f"Hold [bold]{config.HOTKEY}[/] = push-to-talk · "
-                      f"tap = hands-free{translate_hint}. Ctrl+C to quit.")
+                      f"tap = hands-free{translate_hint} · esc = cancel. "
+                      "Ctrl+C to quit.")
 
     # ── fn key state machine ──────────────────────────────────────────────
     def on_fn_down(self, shift=False):
@@ -127,6 +128,21 @@ class DictationApp:
             config.CLEANUP_ENABLED = not config.CLEANUP_ENABLED
             state = "[green]ON[/]" if config.CLEANUP_ENABLED else "[dim]OFF[/]"
             console.print(f"AI Cleanup: {state}")
+
+    def on_esc(self):
+        # Esc while recording: throw the take away — nothing gets pasted.
+        with self._lock:
+            if not self._recording:
+                return
+            self._recording = False
+        self._handsfree = False
+        if self._vad is not None:
+            self._vad.close()
+            self._vad = None
+        self.recorder.stop()  # discard the audio
+        play("cancel")
+        console.print("[dim](cancelled — nothing pasted)[/]")
+        self.on_state("idle")
 
     def on_shift_change(self, pressed):
         # Pressing shift at ANY point while recording toggles translate mode —
@@ -207,6 +223,7 @@ class DictationApp:
             on_release=self.on_fn_up,
             on_double_tap=self.on_fn_double_tap,
             on_shift=self.on_shift_change,
+            on_esc=self.on_esc,
         )
         if config.MENU_BAR:
             self._run_with_menu_bar(listener)

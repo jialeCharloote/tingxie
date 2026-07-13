@@ -8,6 +8,7 @@ _SOUNDS = {
     "start": "/System/Library/Sounds/Pop.aiff",
     "stop": "/System/Library/Sounds/Tink.aiff",
     "error": "/System/Library/Sounds/Basso.aiff",
+    "cancel": "/System/Library/Sounds/Bottle.aiff",
 }
 
 
