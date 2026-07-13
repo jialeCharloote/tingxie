@@ -13,9 +13,11 @@
     </array>
     <key>EnvironmentVariables</key>
     <dict>
-        <!-- Where models/ lives (kept outside the bundle: 230MB). -->
+        <!-- Where models/ lives (kept outside the bundle: 230MB).
+             __TINGXIE_HOME__ is filled in by make-app.sh; install the
+             generated copy from dist/, not this template. -->
         <key>TINGXIE_HOME</key>
-        <string>/Users/charlottezhou/projects/whisper</string>
+        <string>__TINGXIE_HOME__</string>
         <!-- cleanup.py shells out to `ollama serve` if it isn't running. -->
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>

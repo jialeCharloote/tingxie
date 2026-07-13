@@ -47,10 +47,13 @@ APP_SUPPORT="$HOME/Library/Application Support/Tingxie"
 mkdir -p "$APP_SUPPORT"
 [ -e "$APP_SUPPORT/models" ] || ln -s "$MODELS_DIR" "$APP_SUPPORT/models"
 
+# Generate the LaunchAgent from the template with this machine's paths.
+sed "s|__TINGXIE_HOME__|$(dirname "$MODELS_DIR")|" com.tingxie.dictation.plist \
+    > dist/com.tingxie.dictation.plist
+
 echo "==> done: dist/Tingxie.app ($(du -sh dist/Tingxie.app | cut -f1))"
 echo
 echo "Next steps (see README 'Tingxie.app' section):"
 echo "  ditto dist/Tingxie.app /Applications/Tingxie.app"
-echo "  launchctl bootout gui/\$UID/com.whisperflow.dictation   # stop the old one"
-echo "  cp com.tingxie.dictation.plist ~/Library/LaunchAgents/"
+echo "  cp dist/com.tingxie.dictation.plist ~/Library/LaunchAgents/"
 echo "  launchctl bootstrap gui/\$UID ~/Library/LaunchAgents/com.tingxie.dictation.plist"

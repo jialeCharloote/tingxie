@@ -1,10 +1,18 @@
-# 本地版 Whisper Flow(语音听写工具)
+# Tingxie 听写
 
 **[English → README.md](README.md)**
 
-一个完全本地、离线运行的 macOS 语音输入工具(Apple Silicon)。
-按住快捷键说话,松开后文字自动粘贴到当前光标处 —— 所有处理都在你自己的
-电脑上完成,**任何数据都不会离开本机**。
+完全本地、离线运行的 macOS 语音输入工具(Apple Silicon),专为**中英混杂**
+说话的人打造。按住快捷键说话,松开后文字自动粘贴到当前光标处 —— 所有处理
+都在你自己的电脑上完成,**任何数据都不会离开本机**。
+
+为什么再造一个听写工具?
+
+- **中英混说是一等公民** —— SenseVoice 专为 code-switching 训练;云端工具
+  和 macOS 自带听写都处理不好
+- **100% 本地且免费** —— 无订阅、语音不出本机、离线可用
+- **越用越懂你** —— 个人词典纠正专有名词,从你自己的语料蒸馏出的风格画像
+  让润色不再磨平你的语气,本地分析报告帮你了解自己的说话习惯
 
 ## 工作流程
 
@@ -197,15 +205,32 @@ SenseVoice 快到这个开销可以忽略),所见即所说。
 brew install ollama && ollama pull qwen2.5:7b   # 一次性安装
 ```
 
-## 开机自启(可选)
+## 打包成 Tingxie.app(推荐)
 
-项目里附带了 LaunchAgent 配置文件,但**默认没有安装**。启用:
+直接用 venv 跑的话,macOS 权限(麦克风/辅助功能/输入监控)会授给
+Homebrew 的 python 二进制 —— Homebrew 一升级 Python 权限就全失效。
+打成真正的 .app 后权限属于 app 本身,一劳永逸:
 
 ```bash
-cp com.whisperflow.dictation.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.whisperflow.dictation.plist
+./make-app.sh                                        # 构建 dist/Tingxie.app
+ditto dist/Tingxie.app /Applications/Tingxie.app
+cp dist/com.tingxie.dictation.plist ~/Library/LaunchAgents/   # 开机自启
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.tingxie.dictation.plist
 ```
 
-注意:通过 launchd 运行时,macOS 会针对 python 二进制重新弹出
-麦克风/辅助功能/输入监控的授权。日志在 `/tmp/whisperflow.log`。
-停用:`launchctl unload ~/Library/LaunchAgents/com.whisperflow.dictation.plist`。
+首次启动 macOS 会重新弹三个权限(这次是给 Tingxie):按提示允许
+**辅助功能**,在 系统设置 → 隐私与安全性 → **输入监控** 里勾上 Tingxie,
+第一次听写时允许**麦克风**;授权后
+`launchctl kickstart -k gui/$UID/com.tingxie.dictation` 重启一次生效。
+日志在 `/tmp/tingxie.log`。构建细节、验收清单见英文 README 的
+"Tingxie.app" 一节。
+
+## 致谢
+
+站在优秀项目的肩膀上:[SenseVoice](https://github.com/FunAudioLLM/SenseVoice)
+(阿里,Apache-2.0)via [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、
+[Silero VAD](https://github.com/snakers4/silero-vad)、
+[Qwen2.5](https://github.com/QwenLM/Qwen2.5) on [Ollama](https://ollama.com),
+以及 [rumps](https://github.com/jaredks/rumps)、[pynput](https://github.com/moses-palmer/pynput)、
+[py2app](https://github.com/ronaldoussoren/py2app)。灵感来自
+[Wispr Flow](https://wisprflow.ai) —— 这是它的本地、免费、中英混杂优先版本。

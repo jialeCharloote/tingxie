@@ -1,10 +1,22 @@
-# Local Whisper Flow clone
+# Tingxie 听写
 
 **[中文文档 → README.zh.md](README.zh.md)**
 
-A fully local, offline voice-to-text dictation tool for macOS (Apple Silicon).
-Hold a hotkey, speak, release — your speech is transcribed on-device and pasted
-into whatever app has focus. Nothing ever leaves your machine.
+Fully local, offline voice dictation for macOS (Apple Silicon), built for
+people who think in **中英混杂** — mixed Chinese and English. Hold a hotkey,
+speak, release: your words are transcribed on-device and pasted into whatever
+app has focus. Nothing ever leaves your machine.
+
+Why another dictation tool?
+
+- **Code-switching is a first-class citizen** — SenseVoice is trained for
+  mixed zh/en speech; cloud tools (and Apple's built-in dictation) mangle it
+- **100% local & free** — no subscription, no audio leaving your Mac, works
+  offline
+- **It learns you** — a personal dictionary fixes your proper nouns, a style
+  profile distilled from your own transcripts keeps the LLM polish from
+  flattening your voice, and a local analytics report tells you about your
+  own speaking habits
 
 ## Pipeline
 
@@ -213,19 +225,6 @@ auto-starts `ollama serve` if it isn't running.
 brew install ollama && ollama pull qwen2.5:7b   # one-time setup
 ```
 
-## Start at login (optional)
-
-A LaunchAgent plist is included but NOT installed. To enable:
-
-```bash
-cp com.whisperflow.dictation.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.whisperflow.dictation.plist
-```
-
-Note: running under launchd means macOS will re-prompt Microphone/Accessibility/
-Input Monitoring permissions for the python binary itself. Logs go to
-`/tmp/whisperflow.log`. To disable: `launchctl unload ~/Library/LaunchAgents/com.whisperflow.dictation.plist`.
-
 ## Tingxie.app — run as a real app bundle (recommended)
 
 Running via the venv means the TCC permissions (Microphone / Accessibility /
@@ -250,17 +249,13 @@ run), excludes the unused Whisper backends, and ad-hoc signs the bundle. The
 the checkout, or `~/Library/Application Support/Tingxie/` (the build script
 symlinks `models` there so double-clicking the app in Finder also works).
 
-### Switch over from the venv LaunchAgent
+### Install as a login item
 
 ```bash
 ditto dist/Tingxie.app /Applications/Tingxie.app     # stable path for TCC
 
-# stop + remove the old python-based agent
-launchctl bootout gui/$UID/com.whisperflow.dictation
-rm ~/Library/LaunchAgents/com.whisperflow.dictation.plist
-
-# install + start the app-based agent
-cp com.tingxie.dictation.plist ~/Library/LaunchAgents/
+# install + start the LaunchAgent (generated with your paths by make-app.sh)
+cp dist/com.tingxie.dictation.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.tingxie.dictation.plist
 ```
 
@@ -290,6 +285,17 @@ again — just re-allow).
 - [ ] menu bar → History shows past transcripts (中文 reads back correctly)
 - [ ] `launchctl kickstart -k gui/$UID/com.tingxie.dictation` → comes back to Ready
 
-Rollback: `launchctl bootout gui/$UID/com.tingxie.dictation`, re-copy
-`com.whisperflow.dictation.plist` into `~/Library/LaunchAgents/` and
-`launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.whisperflow.dictation.plist`.
+To uninstall: `launchctl bootout gui/$UID/com.tingxie.dictation`, then delete
+the plist from `~/Library/LaunchAgents/` and `/Applications/Tingxie.app`.
+(You can always run from the checkout instead: `./.venv/bin/python main.py`.)
+
+## Acknowledgments
+
+Standing on excellent shoulders: [SenseVoice](https://github.com/FunAudioLLM/SenseVoice)
+(Alibaba, Apache-2.0) via [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx),
+[Silero VAD](https://github.com/snakers4/silero-vad),
+[Qwen2.5](https://github.com/QwenLM/Qwen2.5) on [Ollama](https://ollama.com),
+plus [rumps](https://github.com/jaredks/rumps), [pynput](https://github.com/moses-palmer/pynput),
+and [py2app](https://github.com/ronaldoussoren/py2app). Inspired by
+[Wispr Flow](https://wisprflow.ai) — this is the local, free,
+中英混杂-first take on the idea.
