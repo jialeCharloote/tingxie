@@ -139,6 +139,29 @@ FEW_SHOT_EDIT = [
 ]
 
 
+ANALYZE_PROMPT = """\
+你是一个语音输入习惯分析助手。下面是用户最近的听写记录(每行格式为
+[应用/模式] 文本;完全在本机处理,仅供用户自己参考)。用中文输出一份
+简洁的 markdown 分析,包含这几节:
+
+### 口头禅与高频表达
+最常出现的词和短语(中英都算),附出现语境的例子
+
+### 中英混用习惯
+怎么混、什么话题偏英文、什么场景偏中文
+
+### 常聊的主题
+从内容归纳 3-5 个主题
+
+### 个人词典建议
+反复出现、语音识别容易写错的专有名词(人名/产品名/术语),
+列成 `"错的写法": "正确写法"` 的 JSON 行,方便直接粘进词典文件
+
+### 一个有趣的观察
+
+要具体、引用原文;不要空泛的套话。"""
+
+
 class Cleaner:
     def __init__(self):
         self.url = f"http://{config.OLLAMA_HOST}/api/chat"
@@ -259,6 +282,17 @@ class Cleaner:
         except Exception:
             pass
         return text
+
+
+    def analyze(self, corpus):
+        """Habit analysis over the dictation corpus (usage report)."""
+        try:
+            return self._request(
+                corpus, timeout=config.ANALYZE_TIMEOUT,
+                system=ANALYZE_PROMPT, few_shot=[],
+            )
+        except Exception:
+            return "(分析失败 — Ollama 未响应,稍后再试)"
 
 
 _CJK_TO_ASCII = str.maketrans({"。": ".", "，": ",", "！": "!", "？": "?",

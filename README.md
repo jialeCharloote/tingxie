@@ -90,7 +90,12 @@ The menu-bar icon mirrors state (🎙 / 🔴 / ⏳) and offers:
 - **AI Cleanup (qwen2.5)** — toggle the LLM cleanup pass on/off live
 - **Translate to** — pick the translate-mode target language
 - **History** — the last 5 transcripts (persisted across sessions); click one to copy
-- **Stats** — takes & characters today / all time, estimated typing time saved
+- **Stats** — takes & characters today / all time, zh/en balance, top app, and
+  **Generate AI usage report**: the local LLM analyzes your recent transcripts
+  and reports your 口头禅, code-switching habits, common topics, and suggests
+  personal-dictionary entries. Transcripts are logged to `TAKES_FILE` for this
+  (100% local; `STATS_LOG_TEXT = False` disables it, deleting the file forgets
+  everything)
 
 Subtle start/stop sounds play on record start/end. Quit from the menu bar or
 Ctrl+C in the terminal.

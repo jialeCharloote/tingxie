@@ -252,7 +252,8 @@ class DictationApp:
                 console.print("[dim](no speech detected)[/]")
                 return
             text = dictionary.apply(text)
-            tone = resolve_tone()  # casual/formal/None, from the frontmost app
+            bundle = frontmost_app()
+            tone = resolve_tone(bundle)  # casual/formal/None per app
             tone_tag = f" ({tone})" if tone else ""
             console.print(f"[dim]raw{tone_tag}:[/] {text}")
             injected = False
@@ -299,8 +300,8 @@ class DictationApp:
                     console.print(f"[bold white]→ {text}[/]")
             if not injected:
                 inject(text)
-                self._last_paste = (text, time.monotonic(), frontmost_app())
-            stats.record(len(text))
+                self._last_paste = (text, time.monotonic(), bundle)
+            stats.record(text, mode, bundle)
             history_add(text)  # persist to disk
             self.history.insert(0, text)
             del self.history[config.HISTORY_SIZE:]
@@ -426,20 +427,47 @@ class DictationApp:
             target_menu.add(entry)
             target_items[title] = entry
 
-        # ── menu: usage stats ──────────────────────────────────────────────
+        # ── menu: usage stats + AI habit report ────────────────────────────
         stats_menu = rumps.MenuItem("Stats")
         stats_today = rumps.MenuItem("…")
         stats_total = rumps.MenuItem("…")
-        stats_menu.add(stats_today)
-        stats_menu.add(stats_total)
+        stats_mix = rumps.MenuItem("…")
+
+        _report_title = "Generate AI usage report…"
+
+        def gen_report(item):
+            item.title = "Generating report… (~1 min)"
+            item.set_callback(None)
+
+            def work():
+                try:
+                    path = stats.generate_report(self.cleaner)
+                    stats.open_report(path)
+                    console.print(f"[green]Usage report → {path}[/]")
+                finally:
+                    def restore():
+                        item.title = _report_title
+                        item.set_callback(gen_report)
+                    AppHelper.callAfter(restore)
+
+            threading.Thread(target=work, daemon=True).start()
+
+        report_item = rumps.MenuItem(_report_title, callback=gen_report)
+        for entry in (stats_today, stats_total, stats_mix, report_item):
+            stats_menu.add(entry)
 
         def refresh_stats():
-            today, takes, chars, saved = stats.summary()
+            s = stats.summary()
             stats_today.title = (
-                f"Today: {today['takes']} takes · {today['chars']:,} chars"
+                f"Today: {s['today_takes']} takes · {s['today_chars']:,} chars"
             )
             stats_total.title = (
-                f"All time: {takes} takes · {chars:,} chars · ~{saved:.0f} min saved"
+                f"All time: {s['takes']} takes · {s['chars']:,} chars"
+                f" · ~{s['saved_min']:.0f} min saved"
+            )
+            stats_mix.title = (
+                f"{s['cjk_pct']:.0f}% 中文"
+                + (f" · top: {s['top_app']}" if s["top_app"] else "")
             )
 
         refresh_stats()

@@ -126,6 +126,16 @@ RETRACT_WINDOW = 120
 STATS_ENABLED = True
 STATS_FILE = "~/.config/whisperflow/stats.json"
 
+# Habit analytics: every take (text included) is appended to TAKES_FILE so
+# "Generate AI usage report" can learn your口头禅, zh/en mixing habits, and
+# suggest personal-dictionary entries. 100% local — nothing ever leaves this
+# machine. Set STATS_LOG_TEXT = False to stop collecting transcripts; delete
+# TAKES_FILE to forget history.
+STATS_LOG_TEXT = True
+TAKES_FILE = "~/.config/whisperflow/takes.jsonl"
+REPORT_FILE = "~/.config/whisperflow/usage-report.md"
+ANALYZE_TIMEOUT = 180            # the report LLM call chews a lot of text
+
 # ── Text injection ────────────────────────────────────────────────────────────
 # "paste"  -> copy to clipboard and simulate Cmd+V (most reliable, default)
 # "type"   -> synthesize keystrokes directly (works in Terminal/VS Code)
