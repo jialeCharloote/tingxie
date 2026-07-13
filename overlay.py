@@ -9,6 +9,8 @@ All AppKit calls are dispatched to the main thread via AppHelper.callAfter.
 import AppKit
 from PyObjCTools import AppHelper
 
+import config
+
 _WIDTH, _HEIGHT = 132, 30
 _MARGIN_BOTTOM = 60
 _BG_ALPHA = 0.82
@@ -118,10 +120,12 @@ class Overlay:
         self._ensure_panel()
         attributed = self._attributed(text, with_dot)
         self._label.setAttributedStringValue_(attributed)
-        # Grow the pill to fit the text, up to 60% of the screen width.
+        # Grow the pill to fit the text, but stay compact — long previews are
+        # head-truncated by the label, so the newest words always show.
         screen = AppKit.NSScreen.mainScreen().frame()
         width = min(
             max(_WIDTH, attributed.size().width + 36),
+            config.OVERLAY_MAX_WIDTH,
             screen.size.width * 0.6,
         )
         self._panel.setFrame_display_(
