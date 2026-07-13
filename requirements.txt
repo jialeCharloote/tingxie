@@ -1,0 +1,10 @@
+# Whisper Flow clone — Phase 1 dependencies
+sherpa-onnx>=1.13        # SenseVoice STT runtime — primary backend (zh/en mixing)
+mlx-whisper>=0.4.0       # Whisper on Apple GPU (Metal) — alternative backend
+faster-whisper>=1.1.0    # Whisper on CPU — fallback backend
+sounddevice>=0.4.6       # microphone capture
+numpy>=1.24              # audio buffer handling
+pynput>=1.7.6            # global hotkey + paste keystroke
+pyperclip>=1.8.2         # clipboard read/write (save & restore)
+rich>=13.0               # nice terminal status output
+rumps>=0.4               # macOS menu bar icon
