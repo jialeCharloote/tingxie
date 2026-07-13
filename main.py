@@ -94,6 +94,9 @@ class DictationApp:
         self._last_esc = 0.0
         self._last_paste = None  # (text, monotonic time, bundle id) for retract
         self._lock = threading.Lock()
+        # Serializes take-processing (and retract): pastes land in the order
+        # you spoke, and stats/history files never get concurrent writes.
+        self._process_lock = threading.Lock()
         self.on_state = lambda state: None  # UI hook: idle/recording/processing/…
         self.on_history = lambda text: None  # UI hook: a transcript was pasted
         self.on_preview = lambda text: None  # UI hook: live rolling transcript
@@ -191,20 +194,23 @@ class DictationApp:
         self.on_state("idle")
 
     def _retract_last(self):
-        if self._last_paste is None:
-            return
-        text, when, bundle = self._last_paste
-        if time.monotonic() - when > config.RETRACT_WINDOW:
-            console.print("[dim](last dictation is too old to retract)[/]")
-            return
-        if frontmost_app() != bundle:
-            console.print("[dim](different app in front — retract skipped)[/]")
-            return
-        self._last_paste = None
-        retract(text)
-        play("cancel")
-        shown = text if len(text) <= 40 else text[:39] + "…"
-        console.print(f"[dim](retracted: {shown})[/]")
+        if self._recording:
+            return  # never synthesize keystrokes into an active take
+        with self._process_lock:  # nor while a paste is in flight
+            if self._last_paste is None:
+                return
+            text, when, bundle = self._last_paste
+            if time.monotonic() - when > config.RETRACT_WINDOW:
+                console.print("[dim](last dictation is too old to retract)[/]")
+                return
+            if frontmost_app() != bundle:
+                console.print("[dim](different app in front — retract skipped)[/]")
+                return
+            self._last_paste = None
+            retract(text)
+            play("cancel")
+            shown = text if len(text) <= 40 else text[:39] + "…"
+            console.print(f"[dim](retracted: {shown})[/]")
 
     def on_shift_change(self, pressed):
         # Pressing shift at ANY point while recording toggles translate mode —
@@ -258,7 +264,15 @@ class DictationApp:
     def _process(self, audio, mode, preview):
         try:
             if preview is not None:
-                preview.join()  # recognizer must never run from two threads
+                preview.join()  # its in-flight decode finishes first
+            self._process_take(audio, mode)
+        finally:
+            # Don't stomp the state if the user already started a new take.
+            if not self._recording:
+                self.on_state("idle")
+
+    def _process_take(self, audio, mode):
+        with self._process_lock:
             text = self.transcriber.transcribe(audio)
             if not text:
                 console.print("[dim](no speech detected)[/]")
@@ -322,8 +336,6 @@ class DictationApp:
             self.history.insert(0, text)
             del self.history[config.HISTORY_SIZE:]
             self.on_history(text)
-        finally:
-            self.on_state("idle")
 
     def run(self):
         listener = make_listener(
@@ -366,7 +378,9 @@ class DictationApp:
                 f"AI Cleanup: {'[green]ON[/]' if cleanup_enabled[0] else '[dim]OFF[/]'}"
             )
 
-        cleanup_item = rumps.MenuItem("AI Cleanup (qwen2.5)", callback=toggle_cleanup)
+        cleanup_item = rumps.MenuItem(
+            f"AI Cleanup ({config.CLEANUP_MODEL})", callback=toggle_cleanup
+        )
         cleanup_item.state = cleanup_enabled[0]
         if self.cleaner is None:
             cleanup_item.set_callback(None)  # Ollama unavailable — grey out

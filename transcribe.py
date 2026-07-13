@@ -8,12 +8,16 @@ Backends:
 """
 
 import os
+import threading
 
 import config
 
 
 class Transcriber:
     def __init__(self):
+        # Preview (of a new take) and final decode (of the previous take) can
+        # overlap now that processing is async — never decode concurrently.
+        self._decode_lock = threading.Lock()
         self.backend = config.STT_BACKEND
         if self.backend == "sensevoice":
             import sherpa_onnx
@@ -51,10 +55,11 @@ class Transcriber:
         if audio is None or len(audio) == 0:
             return ""
         if self.backend == "sensevoice":
-            stream = self._rec.create_stream()
-            stream.accept_waveform(config.SAMPLE_RATE, audio)
-            self._rec.decode_stream(stream)
-            return stream.result.text.strip()
+            with self._decode_lock:
+                stream = self._rec.create_stream()
+                stream.accept_waveform(config.SAMPLE_RATE, audio)
+                self._rec.decode_stream(stream)
+                return stream.result.text.strip()
         if self.backend == "mlx":
             result = self._mlx.transcribe(
                 audio,
