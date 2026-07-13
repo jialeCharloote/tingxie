@@ -85,7 +85,11 @@ class FnListener:
                     if now - self._last_press < 0.3:  # double-tap within 300ms
                         self.on_double_tap()
                     self._last_press = now
-                    self.on_press(shift=bool(flags & Quartz.kCGEventFlagMaskShift))
+                    self.on_press(
+                        shift=bool(flags & Quartz.kCGEventFlagMaskShift),
+                        option=bool(flags & Quartz.kCGEventFlagMaskAlternate),
+                        ctrl=bool(flags & Quartz.kCGEventFlagMaskControl),
+                    )
                 elif not pressed and self._down:
                     self._down = False
                     self.on_release()
@@ -160,7 +164,7 @@ if __name__ == "__main__":
 
     listener = make_listener(
         config.HOTKEY,
-        lambda shift=False: print(f"fn DOWN (shift={shift}) → would start recording"),
+        lambda **mods: print(f"fn DOWN {mods} → would start recording"),
         lambda: print("fn UP    → would transcribe + paste"),
     )
     print(f"Listening for '{config.HOTKEY}'… press it (Ctrl+C to quit)")

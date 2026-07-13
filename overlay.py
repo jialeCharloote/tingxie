@@ -69,6 +69,9 @@ class Overlay:
         label.setBordered_(False)
         label.setDrawsBackground_(False)
         label.setAlignment_(AppKit.NSTextAlignmentCenter)
+        # Live preview can outgrow the pill: keep the END of the text visible
+        # (newest words), truncating with "…" at the head.
+        label.cell().setLineBreakMode_(AppKit.NSLineBreakByTruncatingHead)
         content.addSubview_(label)
 
         panel.setContentView_(content)
@@ -113,7 +116,24 @@ class Overlay:
 
     def _show(self, text, with_dot):
         self._ensure_panel()
-        self._label.setAttributedStringValue_(self._attributed(text, with_dot))
+        attributed = self._attributed(text, with_dot)
+        self._label.setAttributedStringValue_(attributed)
+        # Grow the pill to fit the text, up to 60% of the screen width.
+        screen = AppKit.NSScreen.mainScreen().frame()
+        width = min(
+            max(_WIDTH, attributed.size().width + 36),
+            screen.size.width * 0.6,
+        )
+        self._panel.setFrame_display_(
+            AppKit.NSMakeRect(
+                (screen.size.width - width) / 2, _MARGIN_BOTTOM, width, _HEIGHT
+            ),
+            True,
+        )
+        self._panel.contentView().setFrame_(AppKit.NSMakeRect(0, 0, width, _HEIGHT))
+        self._label.setFrame_(
+            AppKit.NSMakeRect(12, (_HEIGHT - 18) / 2, width - 24, 18)
+        )
         self._panel.orderFrontRegardless()
 
     def _hide(self):

@@ -37,6 +37,14 @@ class Recorder:
         )
         self._stream.start()
 
+    def snapshot(self):
+        """Copy of everything recorded so far, without stopping the stream.
+        Safe to call from another thread (list append is atomic)."""
+        frames = self._frames[:]
+        if not frames:
+            return np.zeros(0, dtype=np.float32)
+        return np.concatenate(frames, axis=0).flatten().astype(np.float32)
+
     def stop(self):
         """Stop recording and return the audio as a float32 mono numpy array."""
         if self._stream is not None:

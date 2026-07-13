@@ -72,6 +72,18 @@ TONE_HINTS_TRANSLATE = {
 }
 
 
+def pick_target(text):
+    """Bidirectional translate: with the default English target, speaking
+    mostly-Latin speech flips the target to TRANSLATE_TARGET_ALT (中文) —
+    so one hotkey covers both directions. Non-English targets never flip."""
+    if config.TRANSLATE_TARGET == "English":
+        cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
+        words = len(re.findall(r"[A-Za-z]+", text))
+        if words > cjk:
+            return config.TRANSLATE_TARGET_ALT
+    return config.TRANSLATE_TARGET
+
+
 def _apply_tone(text, tone):
     """Deterministic finishing touches the model can't be trusted with."""
     if tone == "casual" and text[-1:] in ("。", ".") and text[-2:-1] not in ("。", "."):
@@ -100,6 +112,29 @@ FEW_SHOT_TRANSLATE = [
     (
         "这个bug太诡异了我查了一下午都没有repro出来",
         "This bug is so weird — I spent the whole afternoon on it and still couldn't repro it.",
+    ),
+]
+
+
+EDIT_PROMPT = """\
+你是一个文本编辑工具。用户给你一段文本和一条口头指令,按指令修改文本:
+- 只做指令要求的修改,其余尽量保持原样
+- 输出语言按指令要求;指令没提语言就保持原文语言
+- 只输出修改后的文本:不解释、不加引号、不加前后缀"""
+
+FEW_SHOT_EDIT = [
+    (
+        "指令:改得礼貌一点\n\n文本:\n把报告发我",
+        "麻烦你有空的时候把报告发我一下,谢谢!",
+    ),
+    (
+        "指令:translate to English\n\n文本:\n我们下周三下午两点开会,记得带上roadmap",
+        "We'll meet next Wednesday at 2pm — remember to bring the roadmap.",
+    ),
+    (
+        "指令:精简一半\n\n文本:\n"
+        "我个人觉得这个方案整体上来说还是可行的,虽然细节上还有一些需要再打磨的地方",
+        "我觉得方案可行,细节还需打磨。",
     ),
 ]
 
@@ -181,15 +216,16 @@ class Cleaner:
             pass
         return text
 
-    def translate(self, text, tone=None):
-        """Translate to config.TRANSLATE_TARGET; on failure, return the raw text.
+    def translate(self, text, tone=None, target=None):
+        """Translate to `target` (default TRANSLATE_TARGET); on failure,
+        return the raw text.
 
         No length guard here: zh→en legitimately grows the character count
         several-fold, so only an empty answer counts as failure.
         """
         if not text:
             return text
-        system = TRANSLATE_PROMPT.format(target=config.TRANSLATE_TARGET)
+        system = TRANSLATE_PROMPT.format(target=target or config.TRANSLATE_TARGET)
         if tone in TONE_HINTS_TRANSLATE:
             system += "\n" + TONE_HINTS_TRANSLATE[tone]
         try:
@@ -201,6 +237,25 @@ class Cleaner:
             )
             if translated:
                 return _apply_tone(_fix_punctuation(translated), tone)
+        except Exception:
+            pass
+        return text
+
+    def edit(self, instruction, text):
+        """Apply a spoken instruction to a piece of text (voice-edit mode).
+        On any failure the original text comes back — pasting it over the
+        still-selected source is a harmless no-op."""
+        if not instruction or not text:
+            return text
+        try:
+            edited = self._request(
+                f"指令:{instruction}\n\n文本:\n{text}",
+                timeout=config.EDIT_TIMEOUT,
+                system=EDIT_PROMPT,
+                few_shot=FEW_SHOT_EDIT,
+            )
+            if edited:
+                return edited
         except Exception:
             pass
         return text

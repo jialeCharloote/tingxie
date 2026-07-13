@@ -64,18 +64,33 @@ Three ways to interact:
 - **Hold fn** — push-to-talk: speak while holding, release to paste
 - **Tap fn** — hands-free: speak freely; ends when you tap fn again or go
   quiet for ~2s (Silero VAD auto-stop)
-- **Hold shift+fn** — translate mode: speak 中文 (or mixed), natural English
-  gets pasted (any target language via `TRANSLATE_TARGET`). Pressing shift at
-  any point *while* recording also toggles it — key order doesn't matter
+- **Hold shift+fn** — translate mode, and it's bidirectional: speak 中文 → get
+  English, speak English → get 中文. Pressing shift at any point *while*
+  recording also toggles it — key order doesn't matter. Target language is
+  switchable from the menu bar ("Translate to")
+- **Hold option+fn** — voice-edit: select text anywhere first, then speak an
+  instruction ("改得礼貌一点", "translate to English", "精简一半") — the
+  selection is replaced with the edited version
+- **Hold ctrl+fn** — voice note: the transcript is appended (timestamped) to
+  `NOTES_FILE` instead of being pasted — capture a thought without switching
+  windows
 - **Double-tap fn** — toggle AI cleanup on/off (quick shortcut)
 - **Esc** — cancel an in-progress recording; nothing gets pasted
+- **Double-press Esc** (while idle) — retract the last dictation: deletes the
+  just-pasted text (same app, within 2 minutes)
+
+While you speak, the floating pill shows a **live rolling transcript** — the
+take is re-transcribed every second (SenseVoice is fast enough that this is
+free) so you see your words appear in real time.
 
 While dictating, a floating pill at the bottom of the screen shows
 **● Listening… / ⏳ Processing…** (above all windows, click-through, all Spaces).
 The menu-bar icon mirrors state (🎙 / 🔴 / ⏳) and offers:
 
 - **AI Cleanup (qwen2.5)** — toggle the LLM cleanup pass on/off live
+- **Translate to** — pick the translate-mode target language
 - **History** — the last 5 transcripts (persisted across sessions); click one to copy
+- **Stats** — takes & characters today / all time, estimated typing time saved
 
 Subtle start/stop sounds play on record start/end. Quit from the menu bar or
 Ctrl+C in the terminal.
@@ -104,8 +119,12 @@ All knobs live in [`config.py`](config.py):
 - `CLEANUP_MIN_TOKENS` — skip the LLM pass for utterances shorter than this
   (CJK chars + English words; default 8, `0` = always clean)
 - `DICTIONARY_ENABLED` / `DICTIONARY_FILE` — personal dictionary (see below)
-- `TRANSLATE_ENABLED` / `TRANSLATE_TARGET` — shift+fn translate mode and its
-  target language
+- `TRANSLATE_ENABLED` / `TRANSLATE_TARGET` / `TRANSLATE_TARGET_ALT` — shift+fn
+  translate mode; `_ALT` is the reverse direction when you speak English
+- `EDIT_ENABLED` — option+fn voice-edit of selected text
+- `NOTES_ENABLED` / `NOTES_FILE` — ctrl+fn voice notes
+- `PREVIEW_ENABLED` / `PREVIEW_INTERVAL` — live transcript in the pill
+- `STATS_ENABLED` — usage stats in the menu (takes, chars, ~time saved)
 - `INJECT_METHOD` — `paste` (default, most reliable) or `type` (direct keystrokes,
   good for Terminal/VS Code); `INJECT_OVERRIDES` switches method per app
   automatically (Terminal/iTerm/VS Code get `type` out of the box)
@@ -130,8 +149,10 @@ All knobs live in [`config.py`](config.py):
 | `sounds.py`     | start/stop audio cues                            |
 | `audio.py`      | microphone capture                               |
 | `transcribe.py` | STT wrapper (SenseVoice / mlx / faster-whisper)  |
+| `preview.py`    | live rolling transcript while recording          |
 | `dictionary.py` | personal dictionary (post-STT find/replace)      |
-| `inject.py`     | clipboard-paste / keystroke text injection       |
+| `stats.py`      | daily usage stats                                |
+| `inject.py`     | clipboard-paste / keystroke injection, selection grab, retract |
 | `config.py`     | all settings                                     |
 
 ## Translate mode

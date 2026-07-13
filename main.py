@@ -25,16 +25,31 @@ from rich.console import Console
 
 import config
 import dictionary
+import stats
 from audio import Recorder
-from cleanup import Cleaner, worth_cleaning
+from cleanup import Cleaner, pick_target, worth_cleaning
 from history import add as history_add, load as history_load
 from hotkey import make_listener
-from inject import SwapGuard, inject, resolve_tone, swap_or_keep, two_stage_ok
+from inject import (SwapGuard, frontmost_app, grab_selection, inject,
+                    resolve_tone, retract, swap_or_keep, two_stage_ok)
+from preview import Preview
 from sounds import play
 from transcribe import Transcriber
 from vad import VadMonitor
 
 console = Console()
+
+_STATE_FOR_MODE = {"translate": "translating", "edit": "editing", "note": "noting"}
+
+
+def _append_note(text):
+    from datetime import datetime
+    from pathlib import Path
+
+    path = Path(config.NOTES_FILE).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(f"- [{datetime.now():%Y-%m-%d %H:%M}] {text}\n")
 
 
 def check_accessibility():
@@ -72,43 +87,66 @@ class DictationApp:
         self.recorder = Recorder()
         self._recording = False
         self._handsfree = False
-        self._translate = False
+        self._mode = None  # None | "translate" | "edit" | "note"
         self._fn_down_at = 0.0
         self._vad = None
+        self._preview = None
+        self._last_esc = 0.0
+        self._last_paste = None  # (text, monotonic time, bundle id) for retract
         self._lock = threading.Lock()
-        self.on_state = lambda state: None  # UI hook: idle/recording/processing
+        self.on_state = lambda state: None  # UI hook: idle/recording/processing/…
         self.on_history = lambda text: None  # UI hook: a transcript was pasted
+        self.on_preview = lambda text: None  # UI hook: live rolling transcript
         self.history = []  # last few pasted transcripts (newest first)
-        translate_hint = (
-            f" · shift+{config.HOTKEY} = → {config.TRANSLATE_TARGET}"
-            if config.TRANSLATE_ENABLED and self.cleaner is not None
-            else ""
-        )
-        console.print("[bold green]Ready.[/] "
-                      f"Hold [bold]{config.HOTKEY}[/] = push-to-talk · "
-                      f"tap = hands-free{translate_hint} · esc = cancel. "
-                      "Ctrl+C to quit.")
+        hints = [f"hold [bold]{config.HOTKEY}[/] = dictate", "tap = hands-free"]
+        if config.TRANSLATE_ENABLED and self.cleaner is not None:
+            hints.append(f"+shift = → {config.TRANSLATE_TARGET}")
+        if config.EDIT_ENABLED and self.cleaner is not None:
+            hints.append("+option = edit selection")
+        if config.NOTES_ENABLED:
+            hints.append("+ctrl = note")
+        hints.append("esc = cancel · esc×2 = retract")
+        console.print(f"[bold green]Ready.[/] {' · '.join(hints)}. Ctrl+C to quit.")
 
     # ── fn key state machine ──────────────────────────────────────────────
-    def on_fn_down(self, shift=False):
+    def on_fn_down(self, shift=False, option=False, ctrl=False):
         self._fn_down_at = time.monotonic()
         with self._lock:
             if self._recording:
                 return  # hands-free session in progress; the UP ends it
             self._recording = True
-        self._translate = (
-            shift and config.TRANSLATE_ENABLED and self.cleaner is not None
-        )
-        if self._translate:
+        llm_ready = self.cleaner is not None
+        if option and config.EDIT_ENABLED and llm_ready:
+            self._mode = "edit"
+            console.print("[yellow]● recording… (✎ edit instruction)[/]")
+        elif ctrl and config.NOTES_ENABLED:
+            self._mode = "note"
+            console.print("[yellow]● recording… (📝 note)[/]")
+        elif shift and config.TRANSLATE_ENABLED and llm_ready:
+            self._mode = "translate"
             console.print(f"[yellow]● recording… (→ {config.TRANSLATE_TARGET})[/]")
         else:
+            self._mode = None
             console.print("[yellow]● recording…[/]")
-        self.on_state("translating" if self._translate else "recording")
+        self.on_state(_STATE_FOR_MODE.get(self._mode, "recording"))
         play("start")
         self._vad = None
         if config.VAD_ENABLED:
             self._vad = VadMonitor(on_silence=self._on_vad_silence)
         self.recorder.start(on_chunk=self._vad.feed if self._vad else None)
+        if config.PREVIEW_ENABLED:
+            self._preview = Preview(
+                self.recorder, self.transcriber, self._on_preview_text
+            )
+
+    def _on_preview_text(self, text):
+        prefix = {"translate": "⇢ ", "edit": "✎ ", "note": "📝 "}.get(self._mode, "")
+        self.on_preview(prefix + text)
+
+    def _stop_preview(self):
+        if self._preview is not None:
+            self._preview.stop()
+            self._preview = None
 
     def on_fn_up(self):
         held = time.monotonic() - self._fn_down_at
@@ -131,11 +169,20 @@ class DictationApp:
 
     def on_esc(self):
         # Esc while recording: throw the take away — nothing gets pasted.
+        # Double-Esc while idle: retract the last dictation from the document.
         with self._lock:
-            if not self._recording:
-                return
+            cancelling = self._recording
             self._recording = False
+        if not cancelling:
+            now = time.monotonic()
+            if now - self._last_esc < 0.4:
+                self._last_esc = 0.0
+                self._retract_last()
+            else:
+                self._last_esc = now
+            return
         self._handsfree = False
+        self._stop_preview()
         if self._vad is not None:
             self._vad.close()
             self._vad = None
@@ -144,18 +191,37 @@ class DictationApp:
         console.print("[dim](cancelled — nothing pasted)[/]")
         self.on_state("idle")
 
+    def _retract_last(self):
+        if self._last_paste is None:
+            return
+        text, when, bundle = self._last_paste
+        if time.monotonic() - when > config.RETRACT_WINDOW:
+            console.print("[dim](last dictation is too old to retract)[/]")
+            return
+        if frontmost_app() != bundle:
+            console.print("[dim](different app in front — retract skipped)[/]")
+            return
+        self._last_paste = None
+        retract(text)
+        play("cancel")
+        shown = text if len(text) <= 40 else text[:39] + "…"
+        console.print(f"[dim](retracted: {shown})[/]")
+
     def on_shift_change(self, pressed):
         # Pressing shift at ANY point while recording toggles translate mode —
         # so shift-before-fn vs fn-before-shift ordering doesn't matter.
         if not pressed or not self._recording:
             return
+        if self._mode not in (None, "translate"):
+            return  # edit/note modes own this take
         if not (config.TRANSLATE_ENABLED and self.cleaner is not None):
             return
-        self._translate = not self._translate
-        if self._translate:
+        if self._mode is None:
+            self._mode = "translate"
             console.print(f"[yellow]  → {config.TRANSLATE_TARGET} mode[/]")
             self.on_state("translating")
         else:
+            self._mode = None
             console.print("[yellow]  → normal dictation[/]")
             self.on_state("recording")
 
@@ -171,6 +237,7 @@ class DictationApp:
             if not self._recording:
                 return
             self._recording = False
+        self._stop_preview()
         if self._vad is not None:
             self._vad.close()
             self._vad = None
@@ -178,6 +245,7 @@ class DictationApp:
         play("stop")
         self.on_state("processing")
         console.print("[cyan]… transcribing[/]")
+        mode = self._mode
         try:
             text = self.transcriber.transcribe(audio)
             if not text:
@@ -188,8 +256,27 @@ class DictationApp:
             tone_tag = f" ({tone})" if tone else ""
             console.print(f"[dim]raw{tone_tag}:[/] {text}")
             injected = False
-            if self._translate:
-                text = dictionary.apply(self.cleaner.translate(text, tone))
+            if mode == "edit":
+                selection = grab_selection()
+                if not selection:
+                    play("error")
+                    console.print("[red](no text selected — nothing to edit)[/]")
+                    return
+                text = self.cleaner.edit(text, selection)
+                console.print(f"[bold white]✎ {text}[/]")
+                inject(text)  # replaces the still-active selection
+                injected = True
+                self._last_paste = None  # retracting an edit would lose the original
+            elif mode == "note":
+                if (self.cleaner is not None and config.CLEANUP_ENABLED
+                        and worth_cleaning(text)):
+                    text = dictionary.apply(self.cleaner.clean(text))
+                _append_note(text)
+                injected = True  # nothing to paste — it went to the notes file
+                console.print(f"[bold white]📝 → {config.NOTES_FILE}[/]")
+            elif mode == "translate":
+                target = pick_target(text)
+                text = dictionary.apply(self.cleaner.translate(text, tone, target))
                 console.print(f"[bold white]⇢ {text}[/]")
             elif self.cleaner is not None and config.CLEANUP_ENABLED:
                 if not worth_cleaning(text):
@@ -205,12 +292,15 @@ class DictationApp:
                         console.print(f"[bold white]→ {text}[/]")
                     else:
                         console.print("[dim](you moved on — kept the raw paste)[/]")
+                    self._last_paste = (text, time.monotonic(), guard.app)
                 else:
                     # re-apply the dictionary in case the LLM re-broke a term
                     text = dictionary.apply(self.cleaner.clean(text, tone))
                     console.print(f"[bold white]→ {text}[/]")
             if not injected:
                 inject(text)
+                self._last_paste = (text, time.monotonic(), frontmost_app())
+            stats.record(len(text))
             history_add(text)  # persist to disk
             self.history.insert(0, text)
             del self.history[config.HISTORY_SIZE:]
@@ -244,7 +334,8 @@ class DictationApp:
 
             overlay = Overlay()
 
-        icons = {"idle": "🎙", "recording": "🔴", "translating": "🌐", "processing": "⏳"}
+        icons = {"idle": "🎙", "recording": "🔴", "translating": "🌐",
+                 "editing": "✏️", "noting": "📝", "processing": "⏳"}
         app = rumps.App("whisper-flow", title=icons["idle"], quit_button="Quit")
 
         # ── menu: AI cleanup toggle ────────────────────────────────────────
@@ -293,7 +384,6 @@ class DictationApp:
             AppHelper.callAfter(do)
 
         self.on_history = rebuild_history
-        app.menu = [cleanup_item, history_menu, None]  # None = separator
 
         # ── state → icon + overlay (dispatched to the main thread) ─────────
         def set_state(state):
@@ -303,12 +393,66 @@ class DictationApp:
                     overlay.recording()
                 elif state == "translating":
                     overlay.recording(f"→ {config.TRANSLATE_TARGET}…")
+                elif state == "editing":
+                    overlay.recording("✎ instruction…")
+                elif state == "noting":
+                    overlay.recording("📝 note…")
                 elif state == "processing":
                     overlay.processing()
                 else:
                     overlay.hide()
 
         self.on_state = set_state
+
+        def show_preview(text):
+            if overlay is not None:
+                overlay.recording(text)  # rolling live transcript in the pill
+
+        self.on_preview = show_preview
+
+        # ── menu: translate target picker ──────────────────────────────────
+        target_menu = rumps.MenuItem("Translate to")
+        target_items = {}
+
+        def pick_target_cb(item):
+            config.TRANSLATE_TARGET = item.title
+            for title, entry in target_items.items():
+                entry.state = title == item.title
+            console.print(f"Translate target: {item.title}")
+
+        for title in config.TRANSLATE_TARGETS:
+            entry = rumps.MenuItem(title, callback=pick_target_cb)
+            entry.state = title == config.TRANSLATE_TARGET
+            target_menu.add(entry)
+            target_items[title] = entry
+
+        # ── menu: usage stats ──────────────────────────────────────────────
+        stats_menu = rumps.MenuItem("Stats")
+        stats_today = rumps.MenuItem("…")
+        stats_total = rumps.MenuItem("…")
+        stats_menu.add(stats_today)
+        stats_menu.add(stats_total)
+
+        def refresh_stats():
+            today, takes, chars, saved = stats.summary()
+            stats_today.title = (
+                f"Today: {today['takes']} takes · {today['chars']:,} chars"
+            )
+            stats_total.title = (
+                f"All time: {takes} takes · {chars:,} chars · ~{saved:.0f} min saved"
+            )
+
+        refresh_stats()
+
+        prev_on_history = self.on_history
+
+        def on_history_and_stats(text):
+            prev_on_history(text)
+            AppHelper.callAfter(refresh_stats)
+
+        self.on_history = on_history_and_stats
+
+        app.menu = [cleanup_item, target_menu, history_menu, stats_menu, None]  # None = separator
 
         threading.Thread(target=listener.run, daemon=True).start()
         app.run()

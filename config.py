@@ -56,6 +56,25 @@ TRANSLATE_ENABLED = True
 TRANSLATE_TARGET = "English"     # any language the model knows ("日本語", …)
 TRANSLATE_TIMEOUT = 30           # seconds; on timeout we paste the untranslated text
 
+# Bidirectional: when the transcript is already mostly in Latin script (i.e.
+# you spoke English), translate to this instead of TRANSLATE_TARGET.
+TRANSLATE_TARGET_ALT = "中文(简体)"
+# Choices offered in the menu-bar "Translate to" picker.
+TRANSLATE_TARGETS = ["English", "中文(简体)", "日本語"]
+
+# ── Voice-edit mode (fn+option) ───────────────────────────────────────────────
+# Select text anywhere, hold OPTION+fn, and speak an instruction ("改得礼貌
+# 一点", "translate to English", "精简一半") — the selection is replaced by
+# the edited version. Needs Ollama.
+EDIT_ENABLED = True
+EDIT_TIMEOUT = 45                # editing long selections takes the LLM longer
+
+# ── Voice notes (fn+ctrl) ─────────────────────────────────────────────────────
+# Hold CTRL+fn: the transcript is appended (timestamped) to NOTES_FILE instead
+# of being pasted — quick capture without switching windows.
+NOTES_ENABLED = True
+NOTES_FILE = "~/Documents/voice-notes.md"
+
 # ── Personal dictionary ───────────────────────────────────────────────────────
 # Post-STT find/replace for words the model keeps getting wrong (names, jargon).
 # Rules file is created with examples on first run; edits apply live.
@@ -90,6 +109,22 @@ SOUNDS_ENABLED = True    # subtle pop/tink cues on record start/stop
 MENU_BAR = True          # show a menu-bar icon (🎙 idle / 🔴 recording)
 OVERLAY_ENABLED = True   # floating "正在听…" pill at the bottom of the screen
 HISTORY_SIZE = 5         # recent transcripts kept in the menu (click to copy)
+
+# Live transcript preview: while you speak, the pill shows the rolling text
+# (the whole take is re-transcribed every PREVIEW_INTERVAL seconds — SenseVoice
+# is fast enough that this costs almost nothing).
+PREVIEW_ENABLED = True
+PREVIEW_INTERVAL = 1.0
+
+# Double-press Esc (while idle) to retract the last dictation: selects back
+# over the just-pasted text and deletes it. Only within RETRACT_WINDOW seconds
+# and only if you're still in the same app.
+RETRACT_WINDOW = 120
+
+# Usage stats (menu bar): takes + characters per day, estimated typing time
+# saved (vs ~80 chars/min hand-typing).
+STATS_ENABLED = True
+STATS_FILE = "~/.config/whisperflow/stats.json"
 
 # ── Text injection ────────────────────────────────────────────────────────────
 # "paste"  -> copy to clipboard and simulate Cmd+V (most reliable, default)

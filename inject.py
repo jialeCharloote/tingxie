@@ -114,6 +114,68 @@ def inject(text, restore=True):
         _paste(text, restore=restore)
 
 
+def retract(old_text):
+    """Delete the just-injected old_text: select back over it and backspace.
+    Caller is responsible for checking the cursor hasn't moved (same app,
+    recent paste) — this only makes sense right after an inject."""
+    time.sleep(0.1)
+    _keyboard.press(Key.shift)
+    try:
+        for _ in range(len(old_text)):
+            _keyboard.press(Key.left)
+            _keyboard.release(Key.left)
+            time.sleep(0.003)
+    finally:
+        _keyboard.release(Key.shift)
+    time.sleep(0.05)
+    _keyboard.press(Key.backspace)
+    _keyboard.release(Key.backspace)
+
+
+def grab_selection():
+    """Copy the current selection via Cmd+C and return it ('' if none).
+
+    Called right after the hotkey is released (voice-edit mode), so we pause
+    first to let fn/option residue clear — same trick as _paste. The user's
+    clipboard is put back before returning.
+    """
+    previous = None
+    try:
+        previous = pyperclip.paste()
+    except Exception:
+        pass
+    sentinel = "\x00whisperflow:no-selection\x00"
+    pyperclip.copy(sentinel)
+    time.sleep(0.25)  # modifier residue + clipboard settle
+
+    _keyboard.press(Key.cmd)
+    time.sleep(0.03)
+    _keyboard.press("c")
+    time.sleep(0.03)
+    _keyboard.release("c")
+    time.sleep(0.03)
+    _keyboard.release(Key.cmd)
+
+    text = sentinel
+    for _ in range(10):  # apps write the clipboard asynchronously
+        time.sleep(0.08)
+        try:
+            text = pyperclip.paste()
+        except Exception:
+            text = sentinel
+        if text != sentinel:
+            break
+    if text == sentinel:
+        text = ""  # nothing selected — Cmd+C left the clipboard untouched
+
+    try:
+        pyperclip.copy(previous if previous is not None else "")
+    except Exception:
+        pass
+    time.sleep(0.05)
+    return text
+
+
 # ── Two-stage swap ─────────────────────────────────────────────────────────────
 
 class SwapGuard:
