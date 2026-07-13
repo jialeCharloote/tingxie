@@ -117,7 +117,9 @@ SenseVoice 快到这个开销可以忽略),所见即所说。
   shift+fn 翻译模式;说英文时自动反向翻到 `_ALT`(默认简体中文)
 - `EDIT_ENABLED` — option+fn 语音改文字
 - `NOTES_ENABLED` / `NOTES_FILE` — ctrl+fn 语音笔记
-- `PREVIEW_ENABLED` / `PREVIEW_INTERVAL` — 悬浮条实时字幕
+- `PREVIEW_ENABLED` / `PREVIEW_INTERVAL` / `OVERLAY_MAX_WIDTH` —
+  悬浮条实时字幕及其最大宽度
+- `RETRACT_WINDOW` — 双击 Esc 撤回上一条听写的有效时长
 - `STATS_ENABLED` — 菜单栏使用统计(条数、字数、约省多少分钟)
 - `INJECT_METHOD` — `paste`(默认,最稳)或 `type`(直接模拟键入,
   适合 Terminal / VS Code);`INJECT_OVERRIDES` 可按应用自动切换
@@ -151,12 +153,12 @@ SenseVoice 快到这个开销可以忽略),所见即所说。
 
 ## 翻译模式
 
-按住 **shift+fn** 说中文(或平时的中英混杂),粘贴出来的直接是地道英文 ——
-边用中文思考、边写英文邮件/Slack 特别好用。录音时悬浮条显示
-`● → English…`、菜单栏图标变成 🌐,一眼就能分清当前模式。翻译用的是和
-润色同一个本地 Ollama 模型(翻译时自动忽略口头填充词);任何失败都会
-退回粘贴原文,不会丢字。`TRANSLATE_TARGET` 可改成模型认识的任何语言
-(比如 `"日本語"`)。
+按住 **shift+fn** 说话,**双向**翻译:说中文出地道英文,说英文出中文
+(`TRANSLATE_TARGET_ALT`)。边用中文思考、边写英文邮件/Slack 特别好用。
+录音时悬浮条显示 `● → English…`、菜单栏图标变成 🌐,一眼就能分清当前
+模式;想翻成别的语言(比如日语)在菜单栏 **Translate to** 里点一下就行。
+翻译用的是和润色同一个本地 Ollama 模型(翻译时自动忽略口头填充词);
+任何失败都会退回粘贴原文,不会丢字。
 
 ## 自适应风格
 

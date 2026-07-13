@@ -128,7 +128,9 @@ All knobs live in [`config.py`](config.py):
   translate mode; `_ALT` is the reverse direction when you speak English
 - `EDIT_ENABLED` — option+fn voice-edit of selected text
 - `NOTES_ENABLED` / `NOTES_FILE` — ctrl+fn voice notes
-- `PREVIEW_ENABLED` / `PREVIEW_INTERVAL` — live transcript in the pill
+- `PREVIEW_ENABLED` / `PREVIEW_INTERVAL` / `OVERLAY_MAX_WIDTH` — live
+  transcript in the pill and its width cap
+- `RETRACT_WINDOW` — how long double-Esc can retract the last dictation
 - `STATS_ENABLED` — usage stats in the menu (takes, chars, ~time saved)
 - `INJECT_METHOD` — `paste` (default, most reliable) or `type` (direct keystrokes,
   good for Terminal/VS Code); `INJECT_OVERRIDES` switches method per app
@@ -162,13 +164,14 @@ All knobs live in [`config.py`](config.py):
 
 ## Translate mode
 
-Hold **shift+fn** and speak Chinese (or your usual zh/en mix) — what gets
-pasted is natural English. Great for writing English email/Slack while
-thinking out loud in 中文. The overlay shows `● → English…` and the menu-bar
-icon turns 🌐 so you always know which mode you're in. Uses the same local
-Ollama model as cleanup (filler words are dropped during translation); on any
-failure it pastes the untranslated transcript instead of losing your words.
-Set `TRANSLATE_TARGET` to any language the model knows (e.g. `"日本語"`).
+Hold **shift+fn** and speak — it's bidirectional: 中文 in, natural English
+out; English in, 中文 out (`TRANSLATE_TARGET_ALT`). Great for writing English
+email/Slack while thinking out loud in 中文. The overlay shows `● → English…`
+and the menu-bar icon turns 🌐 so you always know which mode you're in; pick
+a different target (e.g. 日本語) from the menu-bar **Translate to** submenu.
+Uses the same local Ollama model as cleanup (filler words are dropped during
+translation); on any failure it pastes the untranslated transcript instead of
+losing your words.
 
 ## Adaptive style
 
