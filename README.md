@@ -66,7 +66,8 @@ Three ways to interact:
 - **Tap fn** — hands-free: speak freely; ends when you tap fn again or go
   quiet for ~2s (Silero VAD auto-stop)
 - **Hold shift+fn** — translate mode: speak 中文 (or mixed), natural English
-  gets pasted (any target language via `TRANSLATE_TARGET`)
+  gets pasted (any target language via `TRANSLATE_TARGET`). Pressing shift at
+  any point *while* recording also toggles it — key order doesn't matter
 - **Double-tap fn** — toggle AI cleanup on/off (quick shortcut)
 
 While dictating, a floating pill at the bottom of the screen shows
@@ -106,7 +107,12 @@ All knobs live in [`config.py`](config.py):
 - `TRANSLATE_ENABLED` / `TRANSLATE_TARGET` — shift+fn translate mode and its
   target language
 - `INJECT_METHOD` — `paste` (default, most reliable) or `type` (direct keystrokes,
-  good for Terminal/VS Code)
+  good for Terminal/VS Code); `INJECT_OVERRIDES` switches method per app
+  automatically (Terminal/iTerm/VS Code get `type` out of the box)
+- `TWO_STAGE_PASTE` — paste the raw transcript instantly, then swap in the
+  LLM-cleaned version in place when it's ready (~1s). The swap self-cancels if
+  you type, click, or switch apps in the meantime, so it never touches
+  anything except the text it just pasted
 - `SOUNDS_ENABLED` / `MENU_BAR` / `OVERLAY_ENABLED` — UX toggles
 
 ## Files

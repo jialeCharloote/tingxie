@@ -29,7 +29,7 @@ from audio import Recorder
 from cleanup import Cleaner, worth_cleaning
 from history import add as history_add, load as history_load
 from hotkey import make_listener
-from inject import inject
+from inject import SwapGuard, inject, swap_or_keep, two_stage_ok
 from sounds import play
 from transcribe import Transcriber
 from vad import VadMonitor
@@ -128,6 +128,21 @@ class DictationApp:
             state = "[green]ON[/]" if config.CLEANUP_ENABLED else "[dim]OFF[/]"
             console.print(f"AI Cleanup: {state}")
 
+    def on_shift_change(self, pressed):
+        # Pressing shift at ANY point while recording toggles translate mode —
+        # so shift-before-fn vs fn-before-shift ordering doesn't matter.
+        if not pressed or not self._recording:
+            return
+        if not (config.TRANSLATE_ENABLED and self.cleaner is not None):
+            return
+        self._translate = not self._translate
+        if self._translate:
+            console.print(f"[yellow]  → {config.TRANSLATE_TARGET} mode[/]")
+            self.on_state("translating")
+        else:
+            console.print("[yellow]  → normal dictation[/]")
+            self.on_state("recording")
+
     def _on_vad_silence(self):
         # Fires from the VAD thread after sustained silence in hands-free mode.
         if self._handsfree:
@@ -154,17 +169,30 @@ class DictationApp:
                 return
             text = dictionary.apply(text)
             console.print(f"[dim]raw:[/] {text}")
+            injected = False
             if self._translate:
                 text = dictionary.apply(self.cleaner.translate(text))
                 console.print(f"[bold white]⇢ {text}[/]")
             elif self.cleaner is not None and config.CLEANUP_ENABLED:
-                if worth_cleaning(text):
+                if not worth_cleaning(text):
+                    console.print("[dim](short utterance — cleanup skipped)[/]")
+                elif two_stage_ok(text):
+                    # paste raw now, swap in the polished version when ready
+                    inject(text, restore=False)
+                    injected = True
+                    guard = SwapGuard()
+                    cleaned = dictionary.apply(self.cleaner.clean(text))
+                    if swap_or_keep(guard, text, cleaned):
+                        text = cleaned
+                        console.print(f"[bold white]→ {text}[/]")
+                    else:
+                        console.print("[dim](you moved on — kept the raw paste)[/]")
+                else:
                     # re-apply the dictionary in case the LLM re-broke a term
                     text = dictionary.apply(self.cleaner.clean(text))
                     console.print(f"[bold white]→ {text}[/]")
-                else:
-                    console.print("[dim](short utterance — cleanup skipped)[/]")
-            inject(text)
+            if not injected:
+                inject(text)
             history_add(text)  # persist to disk
             self.history.insert(0, text)
             del self.history[config.HISTORY_SIZE:]
@@ -178,6 +206,7 @@ class DictationApp:
             on_press=self.on_fn_down,
             on_release=self.on_fn_up,
             on_double_tap=self.on_fn_double_tap,
+            on_shift=self.on_shift_change,
         )
         if config.MENU_BAR:
             self._run_with_menu_bar(listener)

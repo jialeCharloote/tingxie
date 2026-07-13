@@ -22,11 +22,13 @@ class FnListener:
     Also detects double-tap: two presses within 0.3s → calls on_double_tap.
     """
 
-    def __init__(self, on_press, on_release, on_double_tap=None):
+    def __init__(self, on_press, on_release, on_double_tap=None, on_shift=None):
         self.on_press = on_press
         self.on_release = on_release
         self.on_double_tap = on_double_tap or (lambda: None)
+        self.on_shift = on_shift or (lambda pressed: None)
         self._down = False
+        self._shift = False
         self._last_press = 0.0  # time of the last fn press (for double-tap detection)
         import time
 
@@ -51,6 +53,16 @@ class FnListener:
             keycode = Quartz.CGEventGetIntegerValueField(
                 event, Quartz.kCGKeyboardEventKeycode
             )
+            # Report shift transitions (any flagsChanged event carries the
+            # current mask) — lets the app toggle translate mode mid-recording,
+            # so shift-before-fn vs fn-before-shift ordering doesn't matter.
+            shift = bool(
+                Quartz.CGEventGetFlags(event) & Quartz.kCGEventFlagMaskShift
+            )
+            if shift != self._shift:
+                self._shift = shift
+                if keycode != FN_KEYCODE:  # fn's own event handles its shift below
+                    self.on_shift(shift)
             if keycode == FN_KEYCODE:
                 flags = Quartz.CGEventGetFlags(event)
                 pressed = bool(flags & Quartz.kCGEventFlagMaskSecondaryFn)
@@ -121,9 +133,9 @@ class ChordListener:
             listener.join()
 
 
-def make_listener(hotkey, on_press, on_release, on_double_tap=None):
+def make_listener(hotkey, on_press, on_release, on_double_tap=None, on_shift=None):
     if hotkey.lower() in ("fn", "globe", "<fn>"):
-        return FnListener(on_press, on_release, on_double_tap)
+        return FnListener(on_press, on_release, on_double_tap, on_shift)
     return ChordListener(hotkey, on_press, on_release)
 
 

@@ -96,5 +96,22 @@ HISTORY_SIZE = 5         # recent transcripts kept in the menu (click to copy)
 # "type"   -> synthesize keystrokes directly (works in Terminal/VS Code)
 INJECT_METHOD = "paste"
 
+# Per-app overrides: frontmost app's bundle id (substring match) -> method.
+# Terminals swallow Cmd+V oddly under some setups; direct keystrokes are safer.
+INJECT_OVERRIDES = {
+    "com.apple.Terminal": "type",
+    "com.googlecode.iterm2": "type",
+    "com.microsoft.VSCode": "type",
+}
+
+# ── Two-stage paste ───────────────────────────────────────────────────────────
+# Paste the raw transcript INSTANTLY, then swap in the LLM-cleaned version in
+# place once it's ready (~1s later) — zero perceived latency, full polish.
+# The swap self-cancels if you type, click, or switch apps in between, so it
+# only ever touches the text it just pasted. Not used for translate mode,
+# "type" injection, multi-line takes, or takes over TWO_STAGE_MAX_CHARS.
+TWO_STAGE_PASTE = True
+TWO_STAGE_MAX_CHARS = 150
+
 # Restore the user's previous clipboard contents after pasting.
 RESTORE_CLIPBOARD = True
