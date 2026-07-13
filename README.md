@@ -62,8 +62,8 @@ Accessibility + Input Monitoring manually and restart it.
 Three ways to interact:
 
 - **Hold fn** — push-to-talk: speak while holding, release to paste
-- **Tap fn** — hands-free: speak freely; ends when you tap fn again or go
-  quiet for ~2s (Silero VAD auto-stop)
+- **Tap fn** — hands-free: speak freely, pause and think as long as you like;
+  ends when you tap fn again (optional silence auto-stop via `VAD_ENABLED`)
 - **Hold shift+fn** — translate mode, and it's bidirectional: speak 中文 → get
   English, speak English → get 中文. Pressing shift at any point *while*
   recording also toggles it — key order doesn't matter. Target language is

@@ -91,11 +91,13 @@ CHANNELS = 1
 #                                  again OR you stop talking (VAD auto-stop)
 TAP_THRESHOLD = 0.35
 
-VAD_ENABLED = True               # auto-stop hands-free mode on silence
+# Auto-stop hands-free mode on silence. OFF by default: getting cut off while
+# you pause to think is worse than tapping fn to finish — a hands-free take
+# now ends ONLY when you tap fn again (or Esc to cancel). Set True to get
+# silence auto-stop back.
+VAD_ENABLED = False
 VAD_MODEL = "models/silero_vad.onnx"
-# Seconds of silence that ends a hands-free take. Too small and it cuts you
-# off while you pause to think — 3.0 tolerates a between-sentences breather.
-# Remember you can always end explicitly with a tap (or Esc to cancel).
+# Seconds of silence that ends a hands-free take (only when VAD_ENABLED).
 VAD_SILENCE = 3.0
 VAD_THRESHOLD = 0.5              # speech probability threshold
 
@@ -118,7 +120,7 @@ HISTORY_SIZE = 5         # recent transcripts kept in the menu (click to copy)
 # is fast enough that this costs almost nothing).
 PREVIEW_ENABLED = True
 PREVIEW_INTERVAL = 1.0
-OVERLAY_MAX_WIDTH = 440  # px cap for the pill; long previews show the tail
+OVERLAY_MAX_WIDTH = 300  # px cap for the pill; long previews show the tail
 
 # Double-press Esc (while idle) to retract the last dictation: selects back
 # over the just-pasted text and deletes it. Only within RETRACT_WINDOW seconds
