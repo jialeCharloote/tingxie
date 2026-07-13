@@ -29,7 +29,7 @@ from audio import Recorder
 from cleanup import Cleaner, worth_cleaning
 from history import add as history_add, load as history_load
 from hotkey import make_listener
-from inject import SwapGuard, inject, swap_or_keep, two_stage_ok
+from inject import SwapGuard, inject, resolve_tone, swap_or_keep, two_stage_ok
 from sounds import play
 from transcribe import Transcriber
 from vad import VadMonitor
@@ -184,10 +184,12 @@ class DictationApp:
                 console.print("[dim](no speech detected)[/]")
                 return
             text = dictionary.apply(text)
-            console.print(f"[dim]raw:[/] {text}")
+            tone = resolve_tone()  # casual/formal/None, from the frontmost app
+            tone_tag = f" ({tone})" if tone else ""
+            console.print(f"[dim]raw{tone_tag}:[/] {text}")
             injected = False
             if self._translate:
-                text = dictionary.apply(self.cleaner.translate(text))
+                text = dictionary.apply(self.cleaner.translate(text, tone))
                 console.print(f"[bold white]⇢ {text}[/]")
             elif self.cleaner is not None and config.CLEANUP_ENABLED:
                 if not worth_cleaning(text):
@@ -197,7 +199,7 @@ class DictationApp:
                     inject(text, restore=False)
                     injected = True
                     guard = SwapGuard()
-                    cleaned = dictionary.apply(self.cleaner.clean(text))
+                    cleaned = dictionary.apply(self.cleaner.clean(text, tone))
                     if swap_or_keep(guard, text, cleaned):
                         text = cleaned
                         console.print(f"[bold white]→ {text}[/]")
@@ -205,7 +207,7 @@ class DictationApp:
                         console.print("[dim](you moved on — kept the raw paste)[/]")
                 else:
                     # re-apply the dictionary in case the LLM re-broke a term
-                    text = dictionary.apply(self.cleaner.clean(text))
+                    text = dictionary.apply(self.cleaner.clean(text, tone))
                     console.print(f"[bold white]→ {text}[/]")
             if not injected:
                 inject(text)

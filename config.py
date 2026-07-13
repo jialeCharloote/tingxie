@@ -104,6 +104,20 @@ INJECT_OVERRIDES = {
     "com.microsoft.VSCode": "type",
 }
 
+# ── Per-app tone ──────────────────────────────────────────────────────────────
+# Adapt the LLM pass (cleanup AND translation) to where you're dictating:
+# bundle-id substring -> tone. "casual" keeps the chatty vibe (语气词 stay, no
+# trailing period — texting style); "formal" produces polished full sentences.
+# Apps not listed get the neutral default behavior.
+APP_TONES = {
+    "com.apple.MobileSMS": "casual",        # iMessage
+    "com.tencent.xinWeChat": "casual",      # WeChat 微信
+    "com.tinyspeck.slackmacgap": "casual",  # Slack
+    "com.hnc.Discord": "casual",
+    "com.apple.mail": "formal",
+    "com.microsoft.Outlook": "formal",
+}
+
 # ── Two-stage paste ───────────────────────────────────────────────────────────
 # Paste the raw transcript INSTANTLY, then swap in the LLM-cleaned version in
 # place once it's ready (~1s later) — zero perceived latency, full polish.

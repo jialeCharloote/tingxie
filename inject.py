@@ -31,14 +31,24 @@ def frontmost_app():
         return ""
 
 
+def _lookup_by_bundle(mapping, bundle_id, default):
+    if bundle_id:
+        for fragment, value in mapping.items():
+            if fragment.lower() in bundle_id.lower():
+                return value
+    return default
+
+
 def resolve_method(bundle_id=None):
     """Inject method for the frontmost app: per-app override or the default."""
     bundle_id = frontmost_app() if bundle_id is None else bundle_id
-    if bundle_id:
-        for fragment, method in config.INJECT_OVERRIDES.items():
-            if fragment.lower() in bundle_id.lower():
-                return method
-    return config.INJECT_METHOD
+    return _lookup_by_bundle(config.INJECT_OVERRIDES, bundle_id, config.INJECT_METHOD)
+
+
+def resolve_tone(bundle_id=None):
+    """LLM tone for the frontmost app: 'casual', 'formal', or None (neutral)."""
+    bundle_id = frontmost_app() if bundle_id is None else bundle_id
+    return _lookup_by_bundle(config.APP_TONES, bundle_id, None)
 
 
 def _paste(text, restore=True):

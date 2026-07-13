@@ -51,6 +51,34 @@ FEW_SHOT = [
     ),
 ]
 
+# Per-app tone hints, appended to the system prompt (see config.APP_TONES).
+TONE_HINTS_CLEAN = {
+    "casual": (
+        "语境:聊天消息。哈/啦/呀/吧这类语气词不算填充词,保留它们;"
+        "整体保持随手打字的轻松感,句尾不要加句号。"
+    ),
+    "formal": (
+        "语境:正式文本(邮件/文档)。标点和大小写务必完整规范,"
+        "语气词(吧/哈/啦)也算填充词、一并删除。上面的规则 3 依然"
+        "完全适用:不翻译、不换词、不调语序。"
+    ),
+}
+TONE_HINTS_TRANSLATE = {
+    "casual": (
+        "语境:聊天消息。译文要像随手发消息一样自然随意,"
+        "可以用缩写(I'm/don't),句尾不要加句号。"
+    ),
+    "formal": "语境:正式邮件/文档。译文要得体、专业、完整。",
+}
+
+
+def _apply_tone(text, tone):
+    """Deterministic finishing touches the model can't be trusted with."""
+    if tone == "casual" and text[-1:] in ("。", ".") and text[-2:-1] not in ("。", "."):
+        return text[:-1]  # texting style: no trailing period (keep ! ? and …)
+    return text
+
+
 TRANSLATE_PROMPT = """\
 你是一个语音转写的翻译工具。把用户说的话翻译成地道、自然的{target}:
 1. 先忽略口头填充词(嗯、呃、那个、um、uh 等),再翻译
@@ -136,21 +164,24 @@ class Cleaner:
         except Exception:
             pass  # non-fatal: first real request will just be slower
 
-    def clean(self, text):
+    def clean(self, text, tone=None):
         """Return cleaned text; on any failure, fall back to the raw text."""
         if not text:
             return text
+        system = SYSTEM_PROMPT
+        if tone in TONE_HINTS_CLEAN:
+            system += "\n\n" + TONE_HINTS_CLEAN[tone]
         try:
-            cleaned = self._request(text, timeout=config.CLEANUP_TIMEOUT)
+            cleaned = self._request(text, timeout=config.CLEANUP_TIMEOUT, system=system)
             # Guard against a misbehaving model: an empty or wildly longer
             # answer means something went wrong — keep the raw transcript.
             if cleaned and len(cleaned) < len(text) * 3:
-                return _fix_punctuation(cleaned)
+                return _apply_tone(_fix_punctuation(cleaned), tone)
         except Exception:
             pass
         return text
 
-    def translate(self, text):
+    def translate(self, text, tone=None):
         """Translate to config.TRANSLATE_TARGET; on failure, return the raw text.
 
         No length guard here: zh→en legitimately grows the character count
@@ -158,15 +189,18 @@ class Cleaner:
         """
         if not text:
             return text
+        system = TRANSLATE_PROMPT.format(target=config.TRANSLATE_TARGET)
+        if tone in TONE_HINTS_TRANSLATE:
+            system += "\n" + TONE_HINTS_TRANSLATE[tone]
         try:
             translated = self._request(
                 text,
                 timeout=config.TRANSLATE_TIMEOUT,
-                system=TRANSLATE_PROMPT.format(target=config.TRANSLATE_TARGET),
+                system=system,
                 few_shot=FEW_SHOT_TRANSLATE,
             )
             if translated:
-                return _fix_punctuation(translated)
+                return _apply_tone(_fix_punctuation(translated), tone)
         except Exception:
             pass
         return text

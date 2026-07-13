@@ -109,6 +109,9 @@ All knobs live in [`config.py`](config.py):
 - `INJECT_METHOD` — `paste` (default, most reliable) or `type` (direct keystrokes,
   good for Terminal/VS Code); `INJECT_OVERRIDES` switches method per app
   automatically (Terminal/iTerm/VS Code get `type` out of the box)
+- `APP_TONES` — per-app tone for cleanup & translation: `casual` for chat apps
+  (iMessage/WeChat/Slack/Discord preconfigured — 语气词 stay, no trailing
+  period), `formal` for Mail/Outlook (full punctuation, fillers stripped hard)
 - `TWO_STAGE_PASTE` — paste the raw transcript instantly, then swap in the
   LLM-cleaned version in place when it's ready (~1s). The swap self-cancels if
   you type, click, or switch apps in the meantime, so it never touches
