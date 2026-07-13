@@ -143,11 +143,6 @@ class DictationApp:
         prefix = {"translate": "⇢ ", "edit": "✎ ", "note": "📝 "}.get(self._mode, "")
         self.on_preview(prefix + text)
 
-    def _stop_preview(self):
-        if self._preview is not None:
-            self._preview.stop()
-            self._preview = None
-
     def on_fn_up(self):
         held = time.monotonic() - self._fn_down_at
         if self._handsfree:
@@ -177,12 +172,16 @@ class DictationApp:
             now = time.monotonic()
             if now - self._last_esc < 0.4:
                 self._last_esc = 0.0
-                self._retract_last()
+                # keystroke synthesis is slow — never block the event tap
+                threading.Thread(target=self._retract_last, daemon=True).start()
             else:
                 self._last_esc = now
             return
         self._handsfree = False
-        self._stop_preview()
+        preview = self._preview
+        self._preview = None
+        if preview is not None:
+            preview.request_stop()
         if self._vad is not None:
             self._vad.close()
             self._vad = None
@@ -233,11 +232,18 @@ class DictationApp:
             self.stop_and_process()
 
     def stop_and_process(self):
+        """End the take and process it. The heavy work (STT + LLM + inject)
+        runs on a worker thread: this is called from the event-tap callback,
+        and a slow callback gets the tap disabled by macOS — fn presses would
+        silently stop arriving (the 'tap didn't end the take' bug)."""
         with self._lock:
             if not self._recording:
                 return
             self._recording = False
-        self._stop_preview()
+        preview = self._preview
+        self._preview = None
+        if preview is not None:
+            preview.request_stop()  # no join here — that can take ~a decode
         if self._vad is not None:
             self._vad.close()
             self._vad = None
@@ -245,8 +251,14 @@ class DictationApp:
         play("stop")
         self.on_state("processing")
         console.print("[cyan]… transcribing[/]")
-        mode = self._mode
+        threading.Thread(
+            target=self._process, args=(audio, self._mode, preview), daemon=True
+        ).start()
+
+    def _process(self, audio, mode, preview):
         try:
+            if preview is not None:
+                preview.join()  # recognizer must never run from two threads
             text = self.transcriber.transcribe(audio)
             if not text:
                 console.print("[dim](no speech detected)[/]")

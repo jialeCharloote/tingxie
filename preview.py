@@ -37,8 +37,15 @@ class Preview:
             if extra > 0 and self._stop.wait(extra):
                 break
 
-    def stop(self):
-        """Signal the loop to exit and wait for any in-flight decode to finish,
-        so the final transcription never runs concurrently with a preview."""
+    def request_stop(self):
+        """Signal the loop to exit without waiting (cheap, callback-safe)."""
         self._stop.set()
-        self._thread.join(timeout=3)
+
+    def join(self, timeout=3):
+        """Wait for any in-flight decode — call before the final transcription
+        so the recognizer is never used from two threads at once."""
+        self._thread.join(timeout)
+
+    def stop(self):
+        self.request_stop()
+        self.join()

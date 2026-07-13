@@ -40,6 +40,16 @@ class FnListener:
         # Never let an exception escape: it would tear down the CFRunLoop and
         # silently kill the global hotkey for the rest of the session.
         try:
+            import Quartz
+
+            # macOS disables a tap it thinks is too slow; re-enable ourselves
+            # or fn presses silently stop arriving.
+            if type_ in (
+                Quartz.kCGEventTapDisabledByTimeout,
+                Quartz.kCGEventTapDisabledByUserInput,
+            ):
+                Quartz.CGEventTapEnable(self._tap, True)
+                return event
             self._handle(event)
         except Exception:
             import traceback
@@ -98,7 +108,7 @@ class FnListener:
         """Block forever listening for fn. Requires Input Monitoring permission."""
         import Quartz
 
-        tap = Quartz.CGEventTapCreate(
+        self._tap = tap = Quartz.CGEventTapCreate(
             Quartz.kCGSessionEventTap,
             Quartz.kCGHeadInsertEventTap,
             Quartz.kCGEventTapOptionListenOnly,  # observe only, don't swallow keys
