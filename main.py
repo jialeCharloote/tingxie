@@ -93,6 +93,7 @@ class DictationApp:
         self._preview = None
         self._last_esc = 0.0
         self._last_paste = None  # (text, monotonic time, bundle id) for retract
+        self._double_tap = False  # second tap of a double-tap is not a take
         self._lock = threading.Lock()
         # Serializes take-processing (and retract): pastes land in the order
         # you spoke, and stats/history files never get concurrent writes.
@@ -147,6 +148,12 @@ class DictationApp:
         self.on_preview(prefix + text)
 
     def on_fn_up(self):
+        if self._double_tap:
+            # Second tap of a double-tap: the accidental recording it started
+            # is discarded quietly — a double-tap is a toggle, not a take.
+            self._double_tap = False
+            self._cancel_take()
+            return
         held = time.monotonic() - self._fn_down_at
         if self._handsfree:
             # Any tap while hands-free ends the take.
@@ -160,26 +167,18 @@ class DictationApp:
 
     def on_fn_double_tap(self):
         # Quick-toggle AI cleanup via double-tap
+        self._double_tap = True
         if self.cleaner is not None:
             config.CLEANUP_ENABLED = not config.CLEANUP_ENABLED
             state = "[green]ON[/]" if config.CLEANUP_ENABLED else "[dim]OFF[/]"
             console.print(f"AI Cleanup: {state}")
 
-    def on_esc(self):
-        # Esc while recording: throw the take away — nothing gets pasted.
-        # Double-Esc while idle: retract the last dictation from the document.
+    def _cancel_take(self):
+        """Stop and discard an in-progress take. True if one was active."""
         with self._lock:
-            cancelling = self._recording
+            if not self._recording:
+                return False
             self._recording = False
-        if not cancelling:
-            now = time.monotonic()
-            if now - self._last_esc < 0.4:
-                self._last_esc = 0.0
-                # keystroke synthesis is slow — never block the event tap
-                threading.Thread(target=self._retract_last, daemon=True).start()
-            else:
-                self._last_esc = now
-            return
         self._handsfree = False
         preview = self._preview
         self._preview = None
@@ -189,9 +188,23 @@ class DictationApp:
             self._vad.close()
             self._vad = None
         self.recorder.stop()  # discard the audio
-        play("cancel")
-        console.print("[dim](cancelled — nothing pasted)[/]")
         self.on_state("idle")
+        return True
+
+    def on_esc(self):
+        # Esc while recording: throw the take away — nothing gets pasted.
+        # Double-Esc while idle: retract the last dictation from the document.
+        if self._cancel_take():
+            play("cancel")
+            console.print("[dim](cancelled — nothing pasted)[/]")
+            return
+        now = time.monotonic()
+        if now - self._last_esc < 0.4:
+            self._last_esc = 0.0
+            # keystroke synthesis is slow — never block the event tap
+            threading.Thread(target=self._retract_last, daemon=True).start()
+        else:
+            self._last_esc = now
 
     def _retract_last(self):
         if self._recording:
@@ -540,7 +553,21 @@ class DictationApp:
         app.run()
 
 
+def _trim_logs(max_bytes=1_000_000):
+    """launchd appends to the log files forever (see the LaunchAgent plist) —
+    start each run with a bounded file."""
+    import os
+
+    for path in ("/tmp/whisperflow.log", "/tmp/whisperflow.err"):
+        try:
+            if os.path.getsize(path) > max_bytes:
+                open(path, "w").close()
+        except OSError:
+            pass
+
+
 if __name__ == "__main__":
+    _trim_logs()
     try:
         DictationApp().run()
     except KeyboardInterrupt:

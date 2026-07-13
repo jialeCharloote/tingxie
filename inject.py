@@ -31,6 +31,49 @@ except Exception:
 _saved_clipboard = None
 
 
+def _clipboard_snapshot():
+    """Snapshot the ENTIRE pasteboard — every item, every type (text, images,
+    files…). pyperclip only round-trips text; restoring through it would eat
+    a copied image. Returns None if the pasteboard can't be read."""
+    try:
+        from AppKit import NSPasteboard
+
+        items = []
+        for item in NSPasteboard.generalPasteboard().pasteboardItems() or []:
+            entry = {}
+            for t in item.types() or []:
+                data = item.dataForType_(t)
+                if data is not None:
+                    entry[t] = data
+            if entry:
+                items.append(entry)
+        return items
+    except Exception:
+        return None
+
+
+def _clipboard_restore(snapshot):
+    """Put a _clipboard_snapshot back. [] restores an empty pasteboard;
+    None (snapshot failed) leaves the pasteboard alone."""
+    if snapshot is None:
+        return
+    try:
+        from AppKit import NSPasteboard, NSPasteboardItem
+
+        pb = NSPasteboard.generalPasteboard()
+        pb.clearContents()
+        restored = []
+        for entry in snapshot:
+            item = NSPasteboardItem.alloc().init()
+            for t, data in entry.items():
+                item.setData_forType_(data, t)
+            restored.append(item)
+        if restored:
+            pb.writeObjects_(restored)
+    except Exception:
+        pass
+
+
 def frontmost_app():
     """Bundle id of the app that currently has focus ('' if unknown)."""
     try:
@@ -71,10 +114,7 @@ def _paste(text, restore=True):
     global _saved_clipboard
     previous = None
     if config.RESTORE_CLIPBOARD:
-        try:
-            previous = pyperclip.paste()
-        except Exception:
-            previous = None
+        previous = _clipboard_snapshot()
 
     # Let the fn modifier from the just-released hotkey clear out of the event
     # stream — otherwise our Cmd+V can arrive as Cmd+fn+V, which some apps drop.
@@ -103,10 +143,7 @@ def _schedule_restore(previous):
     # Restore late, off-thread, so dictation latency is unaffected.
     def restore():
         time.sleep(1.0)
-        try:
-            pyperclip.copy(previous if previous is not None else "")
-        except Exception:
-            pass
+        _clipboard_restore(previous)
 
     threading.Thread(target=restore, daemon=True).start()
 
@@ -150,11 +187,7 @@ def grab_selection():
     first to let fn/option residue clear — same trick as _paste. The user's
     clipboard is put back before returning.
     """
-    previous = None
-    try:
-        previous = pyperclip.paste()
-    except Exception:
-        pass
+    previous = _clipboard_snapshot()
     sentinel = "\x00whisperflow:no-selection\x00"
     pyperclip.copy(sentinel)
     time.sleep(0.25)  # modifier residue + clipboard settle
@@ -179,10 +212,7 @@ def grab_selection():
     if text == sentinel:
         text = ""  # nothing selected — Cmd+C left the clipboard untouched
 
-    try:
-        pyperclip.copy(previous if previous is not None else "")
-    except Exception:
-        pass
+    _clipboard_restore(previous)
     time.sleep(0.05)
     return text
 

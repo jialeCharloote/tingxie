@@ -64,8 +64,14 @@ def record(text, mode=None, app=""):
         if config.STATS_LOG_TEXT:
             entry = {"ts": datetime.now().isoformat(timespec="seconds"),
                      "text": text, "mode": mode or "dictate", "app": app_short}
-            with open(_takes_path(), "a", encoding="utf-8") as f:
+            takes = _takes_path()
+            with open(takes, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            # Rotate: the corpus is append-only; cap it so years of use don't
+            # accumulate an ever-growing file (analysis only reads the tail).
+            if takes.stat().st_size > 8_000_000:
+                lines = takes.read_text(encoding="utf-8").splitlines()[-5000:]
+                takes.write_text("\n".join(lines) + "\n", encoding="utf-8")
     except OSError:
         pass  # stats are never worth breaking a dictation over
 
