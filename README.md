@@ -65,6 +65,8 @@ Three ways to interact:
 - **Hold fn** — push-to-talk: speak while holding, release to paste
 - **Tap fn** — hands-free: speak freely; ends when you tap fn again or go
   quiet for ~2s (Silero VAD auto-stop)
+- **Hold shift+fn** — translate mode: speak 中文 (or mixed), natural English
+  gets pasted (any target language via `TRANSLATE_TARGET`)
 - **Double-tap fn** — toggle AI cleanup on/off (quick shortcut)
 
 While dictating, a floating pill at the bottom of the screen shows
@@ -101,6 +103,8 @@ All knobs live in [`config.py`](config.py):
 - `CLEANUP_MIN_TOKENS` — skip the LLM pass for utterances shorter than this
   (CJK chars + English words; default 8, `0` = always clean)
 - `DICTIONARY_ENABLED` / `DICTIONARY_FILE` — personal dictionary (see below)
+- `TRANSLATE_ENABLED` / `TRANSLATE_TARGET` — shift+fn translate mode and its
+  target language
 - `INJECT_METHOD` — `paste` (default, most reliable) or `type` (direct keystrokes,
   good for Terminal/VS Code)
 - `SOUNDS_ENABLED` / `MENU_BAR` / `OVERLAY_ENABLED` — UX toggles
@@ -120,6 +124,16 @@ All knobs live in [`config.py`](config.py):
 | `dictionary.py` | personal dictionary (post-STT find/replace)      |
 | `inject.py`     | clipboard-paste / keystroke text injection       |
 | `config.py`     | all settings                                     |
+
+## Translate mode
+
+Hold **shift+fn** and speak Chinese (or your usual zh/en mix) — what gets
+pasted is natural English. Great for writing English email/Slack while
+thinking out loud in 中文. The overlay shows `● → English…` and the menu-bar
+icon turns 🌐 so you always know which mode you're in. Uses the same local
+Ollama model as cleanup (filler words are dropped during translation); on any
+failure it pastes the untranslated transcript instead of losing your words.
+Set `TRANSLATE_TARGET` to any language the model knows (e.g. `"日本語"`).
 
 ## Personal dictionary
 

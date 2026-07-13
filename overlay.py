@@ -21,8 +21,8 @@ class Overlay:
         self._label = None
 
     # ── public API (safe to call from any thread) ─────────────────────────
-    def recording(self):
-        AppHelper.callAfter(self._show, "Listening…", True)
+    def recording(self, text="Listening…"):
+        AppHelper.callAfter(self._show, text, True)
 
     def processing(self):
         AppHelper.callAfter(self._show, "Processing…", False)

@@ -7,6 +7,8 @@ Two backends:
   - ChordListener: pynput-based chord (e.g. "<ctrl>+<alt>+<space>").
 
 Both call on_press() when the hotkey goes down and on_release() when it goes up.
+FnListener additionally passes on_press(shift=...) — whether shift was held at
+the moment fn went down (used for translate mode).
 """
 
 import threading
@@ -50,17 +52,15 @@ class FnListener:
                 event, Quartz.kCGKeyboardEventKeycode
             )
             if keycode == FN_KEYCODE:
-                pressed = bool(
-                    Quartz.CGEventGetFlags(event)
-                    & Quartz.kCGEventFlagMaskSecondaryFn
-                )
+                flags = Quartz.CGEventGetFlags(event)
+                pressed = bool(flags & Quartz.kCGEventFlagMaskSecondaryFn)
                 if pressed and not self._down:
                     self._down = True
                     now = self._time.monotonic()
                     if now - self._last_press < 0.3:  # double-tap within 300ms
                         self.on_double_tap()
                     self._last_press = now
-                    self.on_press()
+                    self.on_press(shift=bool(flags & Quartz.kCGEventFlagMaskShift))
                 elif not pressed and self._down:
                     self._down = False
                     self.on_release()
@@ -133,7 +133,7 @@ if __name__ == "__main__":
 
     listener = make_listener(
         config.HOTKEY,
-        lambda: print("fn DOWN  → would start recording"),
+        lambda shift=False: print(f"fn DOWN (shift={shift}) → would start recording"),
         lambda: print("fn UP    → would transcribe + paste"),
     )
     print(f"Listening for '{config.HOTKEY}'… press it (Ctrl+C to quit)")

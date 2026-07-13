@@ -48,6 +48,14 @@ CLEANUP_TIMEOUT = 20             # seconds; on timeout we paste the raw text
 # as CJK characters + English words; 0 = always clean.
 CLEANUP_MIN_TOKENS = 8
 
+# ── Translation mode ──────────────────────────────────────────────────────────
+# Hold SHIFT+fn to dictate in one language and paste the translation: speak
+# 中文 (or mixed zh/en), get natural English. Uses the same Ollama model as
+# cleanup; needs Ollama available even if CLEANUP_ENABLED is False.
+TRANSLATE_ENABLED = True
+TRANSLATE_TARGET = "English"     # any language the model knows ("日本語", …)
+TRANSLATE_TIMEOUT = 30           # seconds; on timeout we paste the untranslated text
+
 # ── Personal dictionary ───────────────────────────────────────────────────────
 # Post-STT find/replace for words the model keeps getting wrong (names, jargon).
 # Rules file is created with examples on first run; edits apply live.

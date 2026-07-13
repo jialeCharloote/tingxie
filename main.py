@@ -66,31 +66,43 @@ class DictationApp:
         console.print(f"[bold cyan]Loading STT model…[/] ({config.STT_BACKEND})")
         self.transcriber = Transcriber()
         self.cleaner = None
-        if config.CLEANUP_ENABLED:
+        if config.CLEANUP_ENABLED or config.TRANSLATE_ENABLED:
             console.print(f"[bold cyan]Warming up cleanup LLM…[/] ({config.CLEANUP_MODEL})")
             self.cleaner = Cleaner()
         self.recorder = Recorder()
         self._recording = False
         self._handsfree = False
+        self._translate = False
         self._fn_down_at = 0.0
         self._vad = None
         self._lock = threading.Lock()
         self.on_state = lambda state: None  # UI hook: idle/recording/processing
         self.on_history = lambda text: None  # UI hook: a transcript was pasted
         self.history = []  # last few pasted transcripts (newest first)
+        translate_hint = (
+            f" · shift+{config.HOTKEY} = → {config.TRANSLATE_TARGET}"
+            if config.TRANSLATE_ENABLED and self.cleaner is not None
+            else ""
+        )
         console.print("[bold green]Ready.[/] "
                       f"Hold [bold]{config.HOTKEY}[/] = push-to-talk · "
-                      f"tap = hands-free. Ctrl+C to quit.")
+                      f"tap = hands-free{translate_hint}. Ctrl+C to quit.")
 
     # ── fn key state machine ──────────────────────────────────────────────
-    def on_fn_down(self):
+    def on_fn_down(self, shift=False):
         self._fn_down_at = time.monotonic()
         with self._lock:
             if self._recording:
                 return  # hands-free session in progress; the UP ends it
             self._recording = True
-        console.print("[yellow]● recording…[/]")
-        self.on_state("recording")
+        self._translate = (
+            shift and config.TRANSLATE_ENABLED and self.cleaner is not None
+        )
+        if self._translate:
+            console.print(f"[yellow]● recording… (→ {config.TRANSLATE_TARGET})[/]")
+        else:
+            console.print("[yellow]● recording…[/]")
+        self.on_state("translating" if self._translate else "recording")
         play("start")
         self._vad = None
         if config.VAD_ENABLED:
@@ -142,7 +154,10 @@ class DictationApp:
                 return
             text = dictionary.apply(text)
             console.print(f"[dim]raw:[/] {text}")
-            if self.cleaner is not None and config.CLEANUP_ENABLED:
+            if self._translate:
+                text = dictionary.apply(self.cleaner.translate(text))
+                console.print(f"[bold white]⇢ {text}[/]")
+            elif self.cleaner is not None and config.CLEANUP_ENABLED:
                 if worth_cleaning(text):
                     # re-apply the dictionary in case the LLM re-broke a term
                     text = dictionary.apply(self.cleaner.clean(text))
@@ -181,7 +196,7 @@ class DictationApp:
 
             overlay = Overlay()
 
-        icons = {"idle": "🎙", "recording": "🔴", "processing": "⏳"}
+        icons = {"idle": "🎙", "recording": "🔴", "translating": "🌐", "processing": "⏳"}
         app = rumps.App("whisper-flow", title=icons["idle"], quit_button="Quit")
 
         # ── menu: AI cleanup toggle ────────────────────────────────────────
@@ -238,6 +253,8 @@ class DictationApp:
             if overlay is not None:
                 if state == "recording":
                     overlay.recording()
+                elif state == "translating":
+                    overlay.recording(f"→ {config.TRANSLATE_TARGET}…")
                 elif state == "processing":
                     overlay.processing()
                 else:

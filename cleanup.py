@@ -51,6 +51,30 @@ FEW_SHOT = [
     ),
 ]
 
+TRANSLATE_PROMPT = """\
+你是一个语音转写的翻译工具。把用户说的话翻译成地道、自然的{target}:
+1. 先忽略口头填充词(嗯、呃、那个、um、uh 等),再翻译
+2. 意思和语气保持原样:口语翻成地道的口语,不要变正式、不要总结
+3. 原文里已经是{target}的部分自然融入译文
+
+只输出翻译结果。"""
+
+# Translation few-shot: casual spoken zh/en-mixed input → natural English.
+FEW_SHOT_TRANSLATE = [
+    (
+        "嗯我觉得这个feature呃可以放到下个sprint再做",
+        "I think this feature can wait until the next sprint.",
+    ),
+    (
+        "帮我跟他说一下那个meeting改到周四了",
+        "Please let him know the meeting has been moved to Thursday.",
+    ),
+    (
+        "这个bug太诡异了我查了一下午都没有repro出来",
+        "This bug is so weird — I spent the whole afternoon on it and still couldn't repro it.",
+    ),
+]
+
 
 class Cleaner:
     def __init__(self):
@@ -84,9 +108,9 @@ class Cleaner:
                 continue
         raise RuntimeError("Could not start Ollama. Is it installed? (brew install ollama)")
 
-    def _request(self, text, timeout):
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        for raw, cleaned in FEW_SHOT:
+    def _request(self, text, timeout, system=SYSTEM_PROMPT, few_shot=FEW_SHOT):
+        messages = [{"role": "system", "content": system}]
+        for raw, cleaned in few_shot:
             messages.append({"role": "user", "content": raw})
             messages.append({"role": "assistant", "content": cleaned})
         messages.append({"role": "user", "content": text})
@@ -122,6 +146,27 @@ class Cleaner:
             # answer means something went wrong — keep the raw transcript.
             if cleaned and len(cleaned) < len(text) * 3:
                 return _fix_punctuation(cleaned)
+        except Exception:
+            pass
+        return text
+
+    def translate(self, text):
+        """Translate to config.TRANSLATE_TARGET; on failure, return the raw text.
+
+        No length guard here: zh→en legitimately grows the character count
+        several-fold, so only an empty answer counts as failure.
+        """
+        if not text:
+            return text
+        try:
+            translated = self._request(
+                text,
+                timeout=config.TRANSLATE_TIMEOUT,
+                system=TRANSLATE_PROMPT.format(target=config.TRANSLATE_TARGET),
+                few_shot=FEW_SHOT_TRANSLATE,
+            )
+            if translated:
+                return _fix_punctuation(translated)
         except Exception:
             pass
         return text
