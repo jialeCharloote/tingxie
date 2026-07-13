@@ -170,6 +170,16 @@ Ollama model as cleanup (filler words are dropped during translation); on any
 failure it pastes the untranslated transcript instead of losing your words.
 Set `TRANSLATE_TARGET` to any language the model knows (e.g. `"日本語"`).
 
+## Adaptive style
+
+With ≥30 takes in the corpus, the app distills a short **style profile** of
+how you actually talk (which 语气词 you use, punctuation habits, which words
+you keep in English) and injects it into every cleanup/translation — so the
+polish stops flattening your voice: if you end messages with 哈/啦, they stay.
+Refreshes automatically every `STYLE_REFRESH_EVERY` takes, or on demand via
+**Stats → Refresh style profile**. Profile lives at `STYLE_FILE`; delete it to
+reset, `STYLE_ADAPT = False` to disable.
+
 ## Personal dictionary
 
 STT models fumble proper nouns (product names, coworkers, jargon). Fix them

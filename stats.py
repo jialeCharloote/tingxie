@@ -167,3 +167,51 @@ def generate_report(cleaner):
 
 def open_report(path):
     subprocess.Popen(["open", str(path)])
+
+
+# ── Adaptive style profile ─────────────────────────────────────────────────────
+
+def build_style_profile(cleaner):
+    """Distill the corpus into a style profile file; returns the bullets
+    ('' if not enough data). Blocking (LLM call) — run off-thread."""
+    takes = _recent_takes(limit=200, max_chars=6000)
+    if cleaner is None or len(takes) < 30:
+        return ""
+    corpus = "\n".join(f"[{t['app']}/{t['mode']}] {t['text']}" for t in takes)
+    bullets = cleaner.style_profile(corpus)
+    if not bullets:
+        return ""
+    path = Path(config.STYLE_FILE).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    total = summary()["takes"]
+    path.write_text(
+        f"<!-- takes:{total} generated:{datetime.now():%Y-%m-%d %H:%M} -->\n"
+        f"{bullets}\n",
+        encoding="utf-8",
+    )
+    return bullets
+
+
+def _profile_take_count():
+    """Take count recorded when the profile was last generated (-1 if none)."""
+    try:
+        first = Path(config.STYLE_FILE).expanduser().read_text(
+            encoding="utf-8"
+        ).splitlines()[0]
+        return int(re.search(r"takes:(\d+)", first).group(1))
+    except Exception:
+        return -1
+
+
+def maybe_refresh_profile(cleaner, spawn):
+    """Regenerate the style profile in the background when it's stale
+    (never built, or STYLE_REFRESH_EVERY takes have passed). `spawn` is a
+    callable that runs a thunk off-thread."""
+    if not (config.STYLE_ADAPT and config.STATS_LOG_TEXT) or cleaner is None:
+        return
+    total = summary()["takes"]
+    if total < 30:
+        return
+    last = _profile_take_count()
+    if last < 0 or total - last >= config.STYLE_REFRESH_EVERY:
+        spawn(lambda: build_style_profile(cleaner))

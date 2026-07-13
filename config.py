@@ -136,6 +136,16 @@ TAKES_FILE = "~/.config/whisperflow/takes.jsonl"
 REPORT_FILE = "~/.config/whisperflow/usage-report.md"
 ANALYZE_TIMEOUT = 180            # the report LLM call chews a lot of text
 
+# ── Adaptive style ────────────────────────────────────────────────────────────
+# Distill YOUR speaking style from the transcript corpus into a short profile
+# (needs ≥30 takes) and let cleanup/translation respect it — 语气词 you like,
+# punctuation habits, words you keep in English. Auto-refreshes every
+# STYLE_REFRESH_EVERY takes; "Refresh style profile" in the menu forces it;
+# delete STYLE_FILE to reset.
+STYLE_ADAPT = True
+STYLE_FILE = "~/.config/whisperflow/style-profile.md"
+STYLE_REFRESH_EVERY = 100
+
 # ── Text injection ────────────────────────────────────────────────────────────
 # "paste"  -> copy to clipboard and simulate Cmd+V (most reliable, default)
 # "type"   -> synthesize keystrokes directly (works in Terminal/VS Code)

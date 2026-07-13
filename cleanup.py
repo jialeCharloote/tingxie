@@ -139,6 +139,67 @@ FEW_SHOT_EDIT = [
 ]
 
 
+STYLE_PROMPT = """\
+下面是一位用户的语音听写记录(每行 [应用/模式] 文本)。总结这位用户的
+语言风格,给另一个"转写润色工具"当参考,让它润色时不要抹平用户的个人
+习惯。只输出 4-6 条要点,每条一行、以 "- " 开头,聚焦:
+- 语气词习惯(哈/啦/吧/呀 哪些常用、要保留)
+- 标点习惯(爱不爱用感叹号/省略号/句号)
+- 中英混用模式(哪些概念习惯说英文)
+- 整体语气(简短直接?委婉?)
+只描述风格,不要评价、不要建议用户改变。"""
+
+
+def load_style():
+    """Current style profile text ('' if absent/disabled). Mtime-cached."""
+    if not config.STYLE_ADAPT:
+        return ""
+    from pathlib import Path
+
+    path = Path(config.STYLE_FILE).expanduser()
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return ""
+    if _style_cache["mtime"] != mtime:
+        try:
+            text = path.read_text(encoding="utf-8")
+            # drop the metadata comment line, keep the bullets
+            _style_cache["text"] = "\n".join(
+                l for l in text.splitlines() if l.startswith("- ")
+            )
+            _style_cache["mtime"] = mtime
+        except OSError:
+            return _style_cache["text"]
+    return _style_cache["text"]
+
+
+_style_cache = {"mtime": None, "text": ""}
+
+
+def _with_style(system):
+    style = load_style()
+    if style:
+        system += (
+            "\n\n补充规则(优先级最高):以下是这位用户的说话风格,"
+            "润色时必须尊重、不要抹平:\n" + style +
+            "\n尤其注意:风格里说要保留的语气词一律原样保留,它们不算填充词。"
+        )
+    return system
+
+
+def _style_few_shot():
+    """When the profile says the user keeps tone particles, demonstrate it —
+    small models follow an example far better than a rule."""
+    style = load_style()
+    if any(p in style for p in "哈啦吧呀嘛哦"):
+        return [(
+            "嗯那个这个没问题哈我呃明天发你啦",
+            "这个没问题哈,我明天发你啦",
+        )]
+    return []
+
+
 ANALYZE_PROMPT = """\
 你是一个语音输入习惯分析助手。下面是用户最近的听写记录(每行格式为
 [应用/模式] 文本;完全在本机处理,仅供用户自己参考)。用中文输出一份
@@ -229,8 +290,12 @@ class Cleaner:
         system = SYSTEM_PROMPT
         if tone in TONE_HINTS_CLEAN:
             system += "\n\n" + TONE_HINTS_CLEAN[tone]
+        system = _with_style(system)
         try:
-            cleaned = self._request(text, timeout=config.CLEANUP_TIMEOUT, system=system)
+            cleaned = self._request(
+                text, timeout=config.CLEANUP_TIMEOUT, system=system,
+                few_shot=FEW_SHOT + _style_few_shot(),
+            )
             # Guard against a misbehaving model: an empty or wildly longer
             # answer means something went wrong — keep the raw transcript.
             if cleaned and len(cleaned) < len(text) * 3:
@@ -251,6 +316,7 @@ class Cleaner:
         system = TRANSLATE_PROMPT.format(target=target or config.TRANSLATE_TARGET)
         if tone in TONE_HINTS_TRANSLATE:
             system += "\n" + TONE_HINTS_TRANSLATE[tone]
+        system = _with_style(system)
         try:
             translated = self._request(
                 text,
@@ -293,6 +359,18 @@ class Cleaner:
             )
         except Exception:
             return "(分析失败 — Ollama 未响应,稍后再试)"
+
+    def style_profile(self, corpus):
+        """Distill the user's speaking style into a few bullets ('' on failure)."""
+        try:
+            out = self._request(
+                corpus, timeout=config.ANALYZE_TIMEOUT,
+                system=STYLE_PROMPT, few_shot=[],
+            )
+            bullets = [l for l in out.splitlines() if l.startswith("- ")]
+            return "\n".join(bullets)
+        except Exception:
+            return ""
 
 
 _CJK_TO_ASCII = str.maketrans({"。": ".", "，": ",", "！": "!", "？": "?",

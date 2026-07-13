@@ -302,6 +302,10 @@ class DictationApp:
                 inject(text)
                 self._last_paste = (text, time.monotonic(), bundle)
             stats.record(text, mode, bundle)
+            stats.maybe_refresh_profile(
+                self.cleaner,
+                lambda fn: threading.Thread(target=fn, daemon=True).start(),
+            )
             history_add(text)  # persist to disk
             self.history.insert(0, text)
             del self.history[config.HISTORY_SIZE:]
@@ -452,8 +456,32 @@ class DictationApp:
 
             threading.Thread(target=work, daemon=True).start()
 
+        _style_title = "Refresh style profile"
+
+        def refresh_style(item):
+            if self.cleaner is None:
+                return
+            item.title = "Learning your style…"
+            item.set_callback(None)
+
+            def work():
+                try:
+                    bullets = stats.build_style_profile(self.cleaner)
+                    if bullets:
+                        console.print(f"[green]Style profile updated:[/]\n{bullets}")
+                    else:
+                        console.print("[dim](not enough takes yet — need ≥30)[/]")
+                finally:
+                    def restore():
+                        item.title = _style_title
+                        item.set_callback(refresh_style)
+                    AppHelper.callAfter(restore)
+
+            threading.Thread(target=work, daemon=True).start()
+
         report_item = rumps.MenuItem(_report_title, callback=gen_report)
-        for entry in (stats_today, stats_total, stats_mix, report_item):
+        style_item = rumps.MenuItem(_style_title, callback=refresh_style)
+        for entry in (stats_today, stats_total, stats_mix, report_item, style_item):
             stats_menu.add(entry)
 
         def refresh_stats():
