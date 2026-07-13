@@ -84,6 +84,10 @@ class Overlay:
         """'● text' with only the dot in red, or dimmed plain text."""
         para = AppKit.NSMutableParagraphStyle.alloc().init()
         para.setAlignment_(AppKit.NSTextAlignmentCenter)
+        # The attributed string's paragraph style OVERRIDES the cell's
+        # lineBreakMode — without this, long previews truncate at the TAIL
+        # and the newest words are invisible ("the pill stops updating").
+        para.setLineBreakMode_(AppKit.NSLineBreakByTruncatingHead)
         font = AppKit.NSFont.systemFontOfSize_weight_(
             _FONT_SIZE, AppKit.NSFontWeightMedium
         )
