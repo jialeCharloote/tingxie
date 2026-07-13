@@ -7,6 +7,12 @@ people who think in **中英混杂** — mixed Chinese and English. Hold a hotke
 speak, release: your words are transcribed on-device and pasted into whatever
 app has focus. Nothing ever leaves your machine.
 
+[<img src=".github/demo-poster.png" alt="Demo: dictating mixed zh/en speech, cleaned text appears in TextEdit" width="640">](https://jialecharloote.github.io/projects/tingxie-local-dictation/)
+
+**[▶ Watch the 34-second demo (with sound)](https://jialecharloote.github.io/projects/tingxie-local-dictation/)** —
+raw transcript pastes instantly, the LLM-polished version swaps in
+(嗯 dropped, "sp" → "sprint"), then shift+fn turns spoken 中文 into English.
+
 Why another dictation tool?
 
 - **Code-switching is a first-class citizen** — SenseVoice is trained for

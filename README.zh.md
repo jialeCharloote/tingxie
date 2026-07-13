@@ -6,6 +6,12 @@
 说话的人打造。按住快捷键说话,松开后文字自动粘贴到当前光标处 —— 所有处理
 都在你自己的电脑上完成,**任何数据都不会离开本机**。
 
+[<img src=".github/demo-poster.png" alt="演示:中英混杂听写,润色后的文字出现在 TextEdit" width="640">](https://jialecharloote.github.io/projects/tingxie-local-dictation/)
+
+**[▶ 看 34 秒有声演示](https://jialecharloote.github.io/projects/tingxie-local-dictation/)** ——
+原始转写瞬间上屏,LLM 润色版原地替换("嗯"消失、"sp"→"sprint"),
+然后 shift+fn 把说出的中文变成英文。
+
 为什么再造一个听写工具?
 
 - **中英混说是一等公民** —— SenseVoice 专为 code-switching 训练;云端工具
