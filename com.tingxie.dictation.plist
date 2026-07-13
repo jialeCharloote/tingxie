@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tingxie.dictation</string>
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Launch the bundle's own executable so TCC attributes the
+             Microphone / Accessibility / Input Monitoring grants to
+             Tingxie.app — NOT a python or shell wrapper. -->
+        <string>/Applications/Tingxie.app/Contents/MacOS/Tingxie</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- Where models/ lives (kept outside the bundle: 230MB). -->
+        <key>TINGXIE_HOME</key>
+        <string>/Users/charlottezhou/projects/whisper</string>
+        <!-- cleanup.py shells out to `ollama serve` if it isn't running. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <!-- launchd gives us a C/ASCII locale; force UTF-8 so 中文 in
+             transcripts and logs doesn't raise Unicode errors. -->
+        <key>PYTHONUTF8</key>
+        <string>1</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <!-- restart if it crashes, but stay quit after Quit from the menu bar -->
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/tingxie.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/tingxie.err</string>
+</dict>
+</plist>

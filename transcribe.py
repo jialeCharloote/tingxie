@@ -18,7 +18,7 @@ class Transcriber:
         if self.backend == "sensevoice":
             import sherpa_onnx
 
-            d = os.path.join(os.path.dirname(__file__), config.SENSEVOICE_DIR)
+            d = os.path.join(config.BASE_DIR, config.SENSEVOICE_DIR)
             self._rec = sherpa_onnx.OfflineRecognizer.from_sense_voice(
                 model=os.path.join(d, "model.int8.onnx"),
                 tokens=os.path.join(d, "tokens.txt"),

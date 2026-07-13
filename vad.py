@@ -16,9 +16,7 @@ import config
 
 def _make_detector():
     vad_config = sherpa_onnx.VadModelConfig()
-    vad_config.silero_vad.model = os.path.join(
-        os.path.dirname(__file__), config.VAD_MODEL
-    )
+    vad_config.silero_vad.model = os.path.join(config.BASE_DIR, config.VAD_MODEL)
     vad_config.silero_vad.threshold = config.VAD_THRESHOLD
     vad_config.silero_vad.min_silence_duration = config.VAD_SILENCE
     vad_config.silero_vad.min_speech_duration = 0.25

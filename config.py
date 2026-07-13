@@ -1,5 +1,27 @@
 """Central configuration for the local Whisper Flow clone."""
 
+import os
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+# Where models/ lives. Running from a source checkout that's the repo itself,
+# but inside Tingxie.app the code sits in the bundle with no models/ next to
+# it — there we use $TINGXIE_HOME (set in the LaunchAgent plist) or, failing
+# that, ~/Library/Application Support/Tingxie (make-app.sh symlinks models/
+# there so Finder launches work too).
+
+
+def _base_dir():
+    env = os.environ.get("TINGXIE_HOME")
+    if env:
+        return os.path.expanduser(env)
+    src = os.path.dirname(os.path.abspath(__file__))
+    if os.path.isdir(os.path.join(src, "models")):
+        return src
+    return os.path.expanduser("~/Library/Application Support/Tingxie")
+
+
+BASE_DIR = _base_dir()
+
 # ── Speech-to-text ────────────────────────────────────────────────────────────
 # Backend:
 #   "sensevoice"     — Alibaba SenseVoice-Small via sherpa-onnx. Built for
