@@ -16,6 +16,17 @@ import config
 
 _keyboard = Controller()
 
+# Pre-resolve the lazy pyobjc symbol pynput listeners touch from their worker
+# threads. Starting the keyboard + mouse listeners together makes both threads
+# race objc._lazyimport and one dies with KeyError: 'AXIsProcessTrusted';
+# resolving it once here (single-threaded) makes later lookups plain reads.
+try:
+    import HIServices
+
+    HIServices.AXIsProcessTrusted()
+except Exception:
+    pass
+
 # Clipboard contents saved by a two-stage first paste, restored after the swap.
 _saved_clipboard = None
 
