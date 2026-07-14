@@ -218,6 +218,13 @@ Pure-ASCII keys match whole words case-insensitively (including at 中英 seams
 like `用cloud code和`); keys containing CJK match exactly. Keys starting with
 `_` are comments. Edits apply to the next dictation — no restart needed.
 
+**Fuzzy matching** (on by default) catches near-misses you didn't enumerate:
+with `cloud code` in the dictionary, the STT slip `cloude code` still gets
+fixed. Only keys ≥ `DICTIONARY_FUZZY_MIN_LEN` chars are fuzzed, and only spans
+scoring ≥ `DICTIONARY_FUZZY_THRESHOLD` similarity — short keys (like `克劳德`)
+stay exact-only so a loose bar can't rewrite real words. Turn it off with
+`DICTIONARY_FUZZY = False`.
+
 ## LLM cleanup (Phase 3)
 
 Transcripts are polished by a local LLM (`qwen2.5:7b` on Ollama): filler words

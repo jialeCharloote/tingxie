@@ -199,6 +199,12 @@ SenseVoice 快到这个开销可以忽略),所见即所说。
 也能匹配);含中文的键按原样精确匹配。以 `_` 开头的键是注释。
 修改后下一次听写即生效,无需重启。
 
+**模糊匹配**(默认开启)会纠正你没枚举到的近似误识:词典里有 `cloud code`,
+模型这次输出 `cloude code` 也会被修正。只有长度 ≥ `DICTIONARY_FUZZY_MIN_LEN`
+的键参与模糊匹配,且相似度需 ≥ `DICTIONARY_FUZZY_THRESHOLD`——短键(如
+`克劳德`)只走精确匹配,避免过松的阈值改错正常词。设
+`DICTIONARY_FUZZY = False` 可关闭。
+
 ## LLM 润色
 
 转写结果会经本地 LLM(Ollama 上的 `qwen2.5:7b`)润色:去掉口头填充词

@@ -103,6 +103,15 @@ NOTES_FILE = "~/Documents/voice-notes.md"
 DICTIONARY_ENABLED = True
 DICTIONARY_FILE = "~/.config/whisperflow/dictionary.json"
 
+# Fuzzy matching: after the exact pass, also fix near-misses the model produced
+# that you never enumerated (e.g. dict has "cloud code", STT emits "cloude code").
+# Only kicks in for keys ≥ DICTIONARY_FUZZY_MIN_LEN chars, and only replaces spans
+# whose similarity to a key is ≥ DICTIONARY_FUZZY_THRESHOLD (0-1). Short keys are
+# skipped because a low bar over 2-3 chars mangles legitimate words.
+DICTIONARY_FUZZY = True
+DICTIONARY_FUZZY_THRESHOLD = 0.75
+DICTIONARY_FUZZY_MIN_LEN = 4
+
 # ── Audio capture ─────────────────────────────────────────────────────────────
 SAMPLE_RATE = 16000  # Whisper expects 16kHz mono
 CHANNELS = 1
